@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UserCog, Search, Shield, Save, Users as UsersIcon } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { UserCog, Search, Shield, Save, Users as UsersIcon, UserPlus, Mail, Copy } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { logAuditTrail } from "../utils/auditTrail";
 
@@ -16,6 +17,14 @@ export default function UserRoleAssignment() {
     const [selectedUser, setSelectedUser] = useState(null);
     const [selectedRoles, setSelectedRoles] = useState([]);
     const [currentUser, setCurrentUser] = useState(null);
+    const [inviteData, setInviteData] = useState({
+        full_name: '',
+        email: '',
+        department: '',
+        job_title: '',
+        assigned_roles: []
+    });
+    const [lastInvite, setLastInvite] = useState(null);
     const queryClient = useQueryClient();
     const { toast } = useToast();
 
@@ -77,6 +86,70 @@ export default function UserRoleAssignment() {
         }
     });
 
+    const inviteUserMutation = useMutation({
+        mutationFn: async (data) => {
+            const normalizedEmail = data.email.trim().toLowerCase();
+            const existingUser = users.find(u => u.email?.toLowerCase() === normalizedEmail);
+
+            if (existingUser) {
+                throw new Error('A user with this email already exists.');
+            }
+
+            const inviteLink = `${window.location.origin}/?invite_email=${encodeURIComponent(normalizedEmail)}`;
+            const userPayload = {
+                full_name: data.full_name.trim(),
+                email: normalizedEmail,
+                department: data.department,
+                job_title: data.job_title.trim(),
+                assigned_roles: data.assigned_roles,
+                role: 'user',
+                status: 'invited',
+                is_active: false,
+                invited_by: currentUser?.email,
+                invited_at: new Date().toISOString(),
+                invite_link: inviteLink
+            };
+
+            const invitedUser = await base44.entities.User.create(userPayload);
+
+            await logAuditTrail({
+                entityType: 'user',
+                entityId: invitedUser.id,
+                documentNumber: normalizedEmail,
+                actionType: 'create',
+                afterData: userPayload,
+                user: currentUser,
+                severity: 'info',
+                changeSummary: `User invited: ${userPayload.full_name}`
+            });
+
+            return { ...invitedUser, invite_link: inviteLink };
+        },
+        onSuccess: (invitedUser) => {
+            queryClient.invalidateQueries({ queryKey: ['users'] });
+            queryClient.invalidateQueries({ queryKey: ['auditTrails'] });
+            setLastInvite(invitedUser);
+            setInviteData({
+                full_name: '',
+                email: '',
+                department: '',
+                job_title: '',
+                assigned_roles: []
+            });
+            toast({
+                title: "Invitation created",
+                description: "The pending user record is ready and the invite link can be sent.",
+            });
+        },
+        onError: (error) => {
+            toast({
+                title: "Invite failed",
+                description: error.message || "Failed to create invitation",
+                variant: "destructive"
+            });
+        }
+    });
+
     const filteredUsers = users.filter(u => 
         u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -111,8 +184,180 @@ export default function UserRoleAssignment() {
         });
     };
 
+    const handleInviteRoleToggle = (roleCode) => {
+        setInviteData(prev => {
+            const roles = prev.assigned_roles || [];
+            return {
+                ...prev,
+                assigned_roles: roles.includes(roleCode)
+                    ? roles.filter(r => r !== roleCode)
+                    : [...roles, roleCode]
+            };
+        });
+    };
+
+    const handleInviteSubmit = (event) => {
+        event.preventDefault();
+
+        if (!inviteData.full_name.trim() || !inviteData.email.trim()) {
+            toast({
+                title: "Missing details",
+                description: "Full name and email are required.",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        inviteUserMutation.mutate(inviteData);
+    };
+
+    const copyInviteLink = async () => {
+        if (!lastInvite?.invite_link) return;
+        await navigator.clipboard.writeText(lastInvite.invite_link);
+        toast({
+            title: "Copied",
+            description: "Invite link copied to clipboard.",
+        });
+    };
+
+    const openInviteEmail = () => {
+        if (!lastInvite?.email || !lastInvite?.invite_link) return;
+        const subject = encodeURIComponent('You are invited to MatrixSales');
+        const body = encodeURIComponent(
+            `Hello ${lastInvite.full_name || ''},\n\nYou have been invited to MatrixSales.\n\nOpen this link to sign in:\n${lastInvite.invite_link}\n\nRegards,\nMatrixSales Admin`
+        );
+        window.location.href = `mailto:${lastInvite.email}?subject=${subject}&body=${body}`;
+    };
+
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="space-y-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <UserPlus className="w-5 h-5 text-emerald-600" />
+                        Invite User
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <form onSubmit={handleInviteSubmit} className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="invite-name">Full Name</Label>
+                                <Input
+                                    id="invite-name"
+                                    value={inviteData.full_name}
+                                    onChange={(event) => setInviteData(prev => ({ ...prev, full_name: event.target.value }))}
+                                    placeholder="Enter full name"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="invite-email">Email</Label>
+                                <Input
+                                    id="invite-email"
+                                    type="email"
+                                    value={inviteData.email}
+                                    onChange={(event) => setInviteData(prev => ({ ...prev, email: event.target.value }))}
+                                    placeholder="name@company.com"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Department</Label>
+                                <Select
+                                    value={inviteData.department}
+                                    onValueChange={(value) => setInviteData(prev => ({ ...prev, department: value }))}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select department" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="production">Production</SelectItem>
+                                        <SelectItem value="sales">Sales</SelectItem>
+                                        <SelectItem value="purchasing">Purchasing</SelectItem>
+                                        <SelectItem value="quality">Quality Control</SelectItem>
+                                        <SelectItem value="finance">Finance</SelectItem>
+                                        <SelectItem value="maintenance">Maintenance</SelectItem>
+                                        <SelectItem value="admin">Administration</SelectItem>
+                                        <SelectItem value="other">Other</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="invite-job-title">Job Title</Label>
+                                <Input
+                                    id="invite-job-title"
+                                    value={inviteData.job_title}
+                                    onChange={(event) => setInviteData(prev => ({ ...prev, job_title: event.target.value }))}
+                                    placeholder="e.g., Sales Manager"
+                                />
+                            </div>
+                        </div>
+
+                        {roles.length > 0 && (
+                            <div className="space-y-2">
+                                <Label>Initial Roles</Label>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    {roles.map(role => {
+                                        const isChecked = inviteData.assigned_roles.includes(role.role_code);
+                                        return (
+                                            <button
+                                                key={role.id}
+                                                type="button"
+                                                onClick={() => handleInviteRoleToggle(role.role_code)}
+                                                className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-colors ${
+                                                    isChecked ? 'border-emerald-300 bg-emerald-50' : 'border-gray-200 hover:bg-gray-50'
+                                                }`}
+                                            >
+                                                <Checkbox checked={isChecked} />
+                                                <span>
+                                                    <span className="block font-medium">{role.role_name}</span>
+                                                    <span className="block text-xs text-gray-500">{role.role_code}</span>
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex flex-col gap-3 border-t pt-4 md:flex-row md:items-center md:justify-between">
+                            <div className="text-sm text-gray-600">
+                                Creates a pending user record and generates an invite link for email delivery.
+                            </div>
+                            <Button
+                                type="submit"
+                                className="bg-emerald-600 hover:bg-emerald-700"
+                                disabled={inviteUserMutation.isPending}
+                            >
+                                <UserPlus className="w-4 h-4 mr-2" />
+                                {inviteUserMutation.isPending ? 'Creating...' : 'Create Invite'}
+                            </Button>
+                        </div>
+                    </form>
+
+                    {lastInvite && (
+                        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                <div>
+                                    <p className="font-semibold text-emerald-950">Invite ready for {lastInvite.email}</p>
+                                    <p className="break-all text-sm text-emerald-800">{lastInvite.invite_link}</p>
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button type="button" variant="outline" size="sm" onClick={copyInviteLink}>
+                                        <Copy className="w-4 h-4 mr-2" />
+                                        Copy
+                                    </Button>
+                                    <Button type="button" size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={openInviteEmail}>
+                                        <Mail className="w-4 h-4 mr-2" />
+                                        Email
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* User List */}
             <Card>
                 <CardHeader>
@@ -269,6 +514,7 @@ export default function UserRoleAssignment() {
                     )}
                 </CardContent>
             </Card>
+            </div>
         </div>
     );
 }
