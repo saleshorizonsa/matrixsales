@@ -49,10 +49,13 @@ export default function AdminCenter() {
         initialData: []
     });
 
+    const getOrganizationCode = (org) => org.organization_code || org.company_code || org.id;
+    const getOrganizationName = (org) => org.organization_name || org.company_name || org.trade_name || getOrganizationCode(org);
+
     // Helper to get company name
     const getCompanyName = (companyCode) => {
-        const org = organizations.find(o => o.company_code === companyCode);
-        return org?.company_name || companyCode || '-';
+        const org = organizations.find(o => getOrganizationCode(o) === companyCode || o.id === companyCode);
+        return org ? getOrganizationName(org) : companyCode || '-';
     };
 
     const deletePlantMutation = useMutation({

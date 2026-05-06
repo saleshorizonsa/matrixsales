@@ -11,6 +11,9 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 
 export default function StorageLocationForm({ item, onClose, open }) {
+    const getOrganizationCode = (org) => org.organization_code || org.company_code || org.id;
+    const getOrganizationName = (org) => org.organization_name || org.company_name || org.trade_name || getOrganizationCode(org);
+
     const [formData, setFormData] = useState(item || {
         storage_location_code: '',
         storage_location_name: '',
@@ -70,9 +73,12 @@ export default function StorageLocationForm({ item, onClose, open }) {
     };
 
     const handleCompanyChange = (companyCode) => {
+        const organization = organizations.find(org => getOrganizationCode(org) === companyCode);
         setFormData({
             ...formData, 
             company_code: companyCode,
+            company_name: organization ? getOrganizationName(organization) : '',
+            organization_id: organization?.id || '',
             plant_code: '' // Reset plant when company changes
         });
     };
@@ -104,11 +110,14 @@ export default function StorageLocationForm({ item, onClose, open }) {
                                     <SelectValue placeholder="Select company" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {organizations.map(org => (
-                                        <SelectItem key={org.id} value={org.company_code}>
-                                            {org.company_name}
-                                        </SelectItem>
-                                    ))}
+                                    {organizations.map(org => {
+                                        const organizationCode = getOrganizationCode(org);
+                                        return (
+                                            <SelectItem key={org.id} value={organizationCode}>
+                                                {organizationCode} - {getOrganizationName(org)}
+                                            </SelectItem>
+                                        );
+                                    })}
                                 </SelectContent>
                             </Select>
                         </div>
