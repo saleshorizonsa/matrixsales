@@ -29,7 +29,8 @@ import {
     ArrowLeft,
     Brain,
     Landmark,
-    LogOut
+    LogOut,
+    ChevronDown
 } from "lucide-react";
 import { matrixSales } from "@/api/matrixSalesClient";
 import { Button } from "@/components/ui/button";
@@ -126,40 +127,79 @@ function LayoutContent({ children, currentPageName }) {
         "Administration"
     ];
 
+    const sectionIcons = {
+        Overview: LayoutDashboard,
+        Sales: ShoppingCart,
+        Inventory: Package,
+        "Supply Chain": TrendingUp,
+        Finance: DollarSign,
+        Projects: Briefcase,
+        HR: Users,
+        Compliance: FileCheck,
+        Reports: BarChart3,
+        Workflow: Clock,
+        Administration: Settings
+    };
+
+    const activeSection = menuItems.find(item => item.path === currentPageName)?.section || "Overview";
+    const [openSections, setOpenSections] = React.useState(() => ({ [activeSection]: true }));
+
+    React.useEffect(() => {
+        setOpenSections(prev => ({ ...prev, [activeSection]: true }));
+    }, [activeSection]);
+
+    const toggleSection = (section) => {
+        setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
+    };
+
     const NavContent = () => (
         <>
             <OrganizationSwitcher />
-            <div className="space-y-1 px-4">
+            <div className="space-y-2 px-3">
                 {sectionOrder.map(section => {
                     const items = groupedMenuItems[section];
                     if (!items || items.length === 0) return null;
+                    const isOpen = openSections[section];
+                    const SectionIcon = sectionIcons[section] || Database;
                     
                     return (
-                        <div key={section}>
-                            <div className="px-4 pt-4 pb-2">
-                                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                    {section}
-                                </h3>
-                            </div>
+                        <div key={section} className="rounded-xl">
+                            <button
+                                type="button"
+                                onClick={() => toggleSection(section)}
+                                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
+                                    isOpen
+                                        ? "bg-[#eef3f9] text-[#24466f]"
+                                        : "text-slate-700 hover:bg-[#f8fafc] hover:text-[#24466f]"
+                                }`}
+                            >
+                                <SectionIcon className="h-4 w-4 shrink-0" />
+                                <span className="flex-1 text-sm font-semibold">{section}</span>
+                                <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                            </button>
                             
-                            {items.map((item) => {
-                                const Icon = item.icon;
-                                const isActive = currentPageName === item.path;
-                                return (
-                                    <Link
-                                        key={item.path}
-                                        to={createPageUrl(item.path)}
-                                        className={`flex items-center gap-3 rounded-lg px-4 py-2.5 transition-colors ${
-                                            isActive
-                                                ? "bg-[#24466f] text-white shadow-sm"
-                                                : "text-slate-700 hover:bg-[#eef3f9] hover:text-[#24466f]"
-                                        }`}
-                                    >
-                                        <Icon className="w-5 h-5" />
-                                        <span className="font-medium">{item.name}</span>
-                                    </Link>
-                                );
-                            })}
+                            {isOpen && (
+                                <div className="mt-1 space-y-1 border-l border-slate-200 pl-3">
+                                    {items.map((item) => {
+                                        const Icon = item.icon;
+                                        const isActive = currentPageName === item.path;
+                                        return (
+                                            <Link
+                                                key={item.path}
+                                                to={createPageUrl(item.path)}
+                                                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                                                    isActive
+                                                        ? "bg-[#24466f] text-white shadow-sm"
+                                                        : "text-slate-600 hover:bg-[#eef3f9] hover:text-[#24466f]"
+                                                }`}
+                                            >
+                                                <Icon className="h-4 w-4 shrink-0" />
+                                                <span className="font-medium">{item.name}</span>
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     );
                 })}
