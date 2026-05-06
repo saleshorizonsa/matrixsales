@@ -4,14 +4,33 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-    Package2, 
-    TrendingDown, 
-    ShoppingCart,
+import {
     AlertTriangle,
+    BarChart3,
+    Bot,
+    Briefcase,
+    Building2,
+    Calculator,
     CheckCircle2,
     Clock,
-    Shield
+    Database,
+    DollarSign,
+    Factory,
+    FileCheck,
+    FileText,
+    Landmark,
+    Package2,
+    Receipt,
+    Recycle,
+    Settings,
+    Shield,
+    ShoppingCart,
+    Target,
+    TrendingDown,
+    TrendingUp,
+    Truck,
+    Users,
+    Warehouse
 } from "lucide-react";
 import StatCard from "@/components/erp/StatCard";
 import { Link } from "react-router-dom";
@@ -19,402 +38,350 @@ import { createPageUrl } from "@/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { usePermissions } from "@/components/utils/usePermissions";
 import { useLanguage } from "@/components/utils/languageContext";
-import AdminCenter from "./AdminCenter";
-import AIAssistant from "./AIAssistant";
-import Analytics from "./Analytics";
-import ApprovalWorkflows from "./ApprovalWorkflows";
-import Approvals from "./Approvals";
-import AssetLifecycle from "./AssetLifecycle";
-import AssetScanner from "./AssetScanner";
-import AssetVerification from "./AssetVerification";
-import BudgetManagement from "./BudgetManagement";
-import CoilManagement from "./CoilManagement";
-import ComplianceReports from "./ComplianceReports";
-import Costing from "./Costing";
-import DemandPlanning from "./DemandPlanning";
-import DepreciationReports from "./DepreciationReports";
-import Finance from "./Finance";
-import FinancialReports from "./FinancialReports";
-import FixedAssets from "./FixedAssets";
-import HR from "./HR";
-import HRReports from "./HRReports";
-import ITSecurityReports from "./ITSecurityReports";
-import Integrations from "./Integrations";
-import Inventory from "./Inventory";
-import InventoryReports from "./InventoryReports";
-import KPIDashboard from "./KPIDashboard";
-import ManufacturingReports from "./ManufacturingReports";
-import MasterDataManagement from "./MasterDataManagement";
-import Notifications from "./Notifications";
-import POS from "./POS";
-import Production from "./Production";
-import Projects from "./Projects";
-import Purchasing from "./Purchasing";
-import Quality from "./Quality";
-import QualityMaintenanceReports from "./QualityMaintenanceReports";
-import Reports from "./Reports";
-import Sales from "./Sales";
-import SalesReports from "./SalesReports";
-import SupplyChain from "./SupplyChain";
-import TreasuryManagement from "./TreasuryManagement";
-import ZakatManagement from "./ZakatManagement";
-import ZATCA from "./ZATCA";
 
-const ModulePanel = ({ components }) => (
-    <div className="space-y-6">
-        {components.map(({ name, Component }) => (
-            <section key={name}>
-                <Component />
-            </section>
+const toList = (value) => (Array.isArray(value) ? value : []);
+const sumBy = (items, key) => items.reduce((sum, item) => sum + (Number(item?.[key]) || 0), 0);
+const formatSar = (value) => `SAR ${(Number(value) || 0).toLocaleString()}`;
+const formatSarM = (value) => `SAR ${((Number(value) || 0) / 1000000).toFixed(1)}M`;
+
+function useEntityList(entityName, queryKey, sort, limit) {
+    return useQuery({
+        queryKey,
+        queryFn: () => matrixSales.entities[entityName].list(sort, limit),
+        initialData: []
+    });
+}
+
+const ManagementCard = ({ title, value, description, icon: Icon, color = "blue", to }) => {
+    const colorMap = {
+        blue: "bg-blue-50 text-blue-700 ring-blue-100",
+        emerald: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+        indigo: "bg-indigo-50 text-indigo-700 ring-indigo-100",
+        amber: "bg-amber-50 text-amber-700 ring-amber-100",
+        red: "bg-red-50 text-red-700 ring-red-100",
+        purple: "bg-purple-50 text-purple-700 ring-purple-100",
+        slate: "bg-slate-50 text-slate-700 ring-slate-100"
+    };
+
+    const content = (
+        <Card className="h-full border-slate-200 bg-white transition-shadow hover:shadow-md">
+            <CardContent className="flex h-full flex-col gap-4 p-5">
+                <div className="flex items-start justify-between gap-3">
+                    <div className={`rounded-xl p-3 ring-1 ${colorMap[color] || colorMap.blue}`}>
+                        <Icon className="h-5 w-5" />
+                    </div>
+                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Dashboard
+                    </span>
+                </div>
+                <div>
+                    <p className="text-sm font-medium text-slate-500">{title}</p>
+                    <p className="mt-1 text-2xl font-bold text-slate-900">{value}</p>
+                    {description && <p className="mt-2 text-sm text-slate-600">{description}</p>}
+                </div>
+            </CardContent>
+        </Card>
+    );
+
+    if (!to) return content;
+
+    return (
+        <Link to={createPageUrl(to)} className="block h-full">
+            {content}
+        </Link>
+    );
+};
+
+const ModuleCards = ({ cards }) => (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {cards.map((card) => (
+            <ManagementCard key={`${card.title}-${card.to || "static"}`} {...card} />
         ))}
     </div>
 );
 
-function DashboardOverview() {
+function OverviewCards() {
     const { isAdmin, hasPermission, getRoleNames } = usePermissions();
     const { t } = useLanguage();
 
-    const { data: assets = [] } = useQuery({
-        queryKey: ['assets'],
-        queryFn: () => matrixSales.entities.FixedAsset.list(),
-        initialData: []
-    });
+    const { data: assets = [] } = useEntityList("FixedAsset", ["dashboard-assets"]);
+    const { data: salesOrders = [] } = useEntityList("SalesOrder", ["dashboard-sales-orders"], "-order_date", 10);
+    const { data: maintenance = [] } = useEntityList("AssetMaintenance", ["dashboard-maintenance"], "-maintenance_date", 20);
+    const { data: approvalRequests = [] } = useEntityList("ApprovalRequest", ["dashboard-approval-requests"], "-created_date", 10);
+    const { data: verificationTasks = [] } = useEntityList("AssetVerificationTask", ["dashboard-verification-tasks"], "-scheduled_date", 5);
 
-    const { data: salesOrders = [] } = useQuery({
-        queryKey: ['salesOrders'],
-        queryFn: () => matrixSales.entities.SalesOrder.list('-order_date', 10),
-        initialData: []
-    });
+    const assetList = toList(assets);
+    const salesOrderList = toList(salesOrders);
+    const maintenanceList = toList(maintenance);
+    const approvalRequestList = toList(approvalRequests);
+    const verificationTaskList = toList(verificationTasks);
 
-    const { data: maintenance = [] } = useQuery({
-        queryKey: ['maintenance'],
-        queryFn: () => matrixSales.entities.AssetMaintenance.list('-maintenance_date', 20),
-        initialData: []
-    });
-
-    const { data: approvalRequests = [] } = useQuery({
-        queryKey: ['approvalRequests'],
-        queryFn: () => matrixSales.entities.ApprovalRequest.list('-created_date', 10),
-        initialData: []
-    });
-
-    const { data: verificationTasks = [] } = useQuery({
-        queryKey: ['verificationTasks'],
-        queryFn: () => matrixSales.entities.AssetVerificationTask.list('-scheduled_date', 5),
-        initialData: []
-    });
-
-    const assetList = Array.isArray(assets) ? assets : [];
-    const salesOrderList = Array.isArray(salesOrders) ? salesOrders : [];
-    const maintenanceList = Array.isArray(maintenance) ? maintenance : [];
-    const approvalRequestList = Array.isArray(approvalRequests) ? approvalRequests : [];
-    const verificationTaskList = Array.isArray(verificationTasks) ? verificationTasks : [];
-
-    const activeAssets = assetList.filter(a => a.status === 'active').length;
-    const totalAssetValue = assetList.reduce((sum, a) => sum + (a.acquisition_cost || 0), 0);
-    const totalNBV = assetList.reduce((sum, a) => sum + (a.net_book_value || 0), 0);
-    
-    const pendingSalesOrders = salesOrderList.filter(o =>
-        o.status === 'pending_approval' || o.status === 'draft'
-    ).length;
-
-    const overdueMaintenance = maintenanceList.filter(m =>
-        m.status === 'scheduled' && new Date(m.scheduled_date) < new Date()
-    ).length;
-
-    const pendingApprovals = approvalRequestList.filter(a => a.status === 'pending').length;
-
-    const overdueVerifications = verificationTaskList.filter(t =>
-        t.status === 'scheduled' && new Date(t.scheduled_date) < new Date()
-    ).length;
+    const activeAssets = assetList.filter(a => a.status === "active").length;
+    const totalAssetValue = sumBy(assetList, "acquisition_cost");
+    const totalNBV = sumBy(assetList, "net_book_value");
+    const pendingSalesOrders = salesOrderList.filter(o => o.status === "pending_approval" || o.status === "draft").length;
+    const overdueMaintenance = maintenanceList.filter(m => m.status === "scheduled" && new Date(m.scheduled_date) < new Date()).length;
+    const pendingApprovals = approvalRequestList.filter(a => a.status === "pending").length;
+    const overdueVerifications = verificationTaskList.filter(t => t.status === "scheduled" && new Date(t.scheduled_date) < new Date()).length;
 
     return (
         <div className="space-y-4 md:space-y-6">
             {!isAdmin && getRoleNames().length > 0 && (
                 <div className="flex flex-wrap gap-2">
                     {getRoleNames().map((roleName, idx) => (
-                        <Badge key={idx} variant="outline">
-                            {roleName}
-                        </Badge>
+                        <Badge key={idx} variant="outline">{roleName}</Badge>
                     ))}
                 </div>
             )}
 
-            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                {hasPermission('finance.fixed_asset', 'view') && (
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-2 md:gap-4 lg:grid-cols-4">
+                {hasPermission("finance.fixed_asset", "view") && (
                     <>
-                        <StatCard
-                            title={`${t('active')} Assets`}
-                            value={activeAssets}
-                            icon={Package2}
-                            trend={`SAR ${(totalAssetValue / 1000000).toFixed(1)}M total value`}
-                            color="emerald"
-                        />
-                        <StatCard
-                            title={t('netBookValue')}
-                            value={`SAR ${(totalNBV / 1000000).toFixed(1)}M`}
-                            icon={TrendingDown}
-                            trend="Current valuation"
-                            color="blue"
-                        />
+                        <StatCard title={`${t("active")} Assets`} value={activeAssets} icon={Package2} trend={`${formatSarM(totalAssetValue)} total value`} color="emerald" />
+                        <StatCard title={t("netBookValue")} value={formatSarM(totalNBV)} icon={TrendingDown} trend="Current valuation" color="blue" />
                     </>
                 )}
-                
-                {hasPermission('sales.sales_order', 'view') && (
-                    <StatCard
-                        title={`${t('pending')} Sales Orders`}
-                        value={pendingSalesOrders}
-                        icon={ShoppingCart}
-                        trend="Awaiting processing"
-                        color="indigo"
-                    />
+                {hasPermission("sales.sales_order", "view") && (
+                    <StatCard title={`${t("pending")} Sales Orders`} value={pendingSalesOrders} icon={ShoppingCart} trend="Awaiting processing" color="indigo" />
                 )}
-                
-                {(hasPermission('maintenance.work_order', 'view') || hasPermission('finance.fixed_asset', 'view')) && (
-                    <StatCard
-                        title={`${t('overdue')} ${t('maintenance')}`}
-                        value={overdueMaintenance}
-                        icon={AlertTriangle}
-                        trend="Requires attention"
-                        color="red"
-                    />
+                {(hasPermission("maintenance.work_order", "view") || hasPermission("finance.fixed_asset", "view")) && (
+                    <StatCard title={`${t("overdue")} ${t("maintenance")}`} value={overdueMaintenance} icon={AlertTriangle} trend="Requires attention" color="red" />
                 )}
             </div>
 
             <div className="space-y-3">
                 {pendingApprovals > 0 && (
-                    <Alert className="bg-yellow-50 border-yellow-200">
+                    <Alert className="border-yellow-200 bg-yellow-50">
                         <Clock className="h-4 w-4 text-yellow-600" />
                         <AlertDescription className="text-yellow-900">
-                            <strong>{pendingApprovals} approval requests</strong> are waiting for your review
-                            <Link to={createPageUrl('Approvals')} className="ml-2 underline font-semibold">
-                                View {t('approvals')} →
-                            </Link>
+                            <strong>{pendingApprovals} approval requests</strong> are waiting for review
+                            <Link to={createPageUrl("Approvals")} className="ml-2 font-semibold underline">View {t("approvals")}</Link>
                         </AlertDescription>
                     </Alert>
                 )}
-
-                {overdueMaintenance > 0 && hasPermission('maintenance.work_order', 'view') && (
-                    <Alert className="bg-red-50 border-red-200">
-                        <AlertTriangle className="h-4 w-4 text-red-600" />
-                        <AlertDescription className="text-red-900">
-                            <strong>{overdueMaintenance} {t('maintenance')} tasks</strong> are {t('overdue')}
-                            <Link to={createPageUrl('FixedAssets')} className="ml-2 underline font-semibold">
-                                View {t('maintenance')} →
-                            </Link>
-                        </AlertDescription>
-                    </Alert>
-                )}
-
-                {overdueVerifications > 0 && hasPermission('finance.fixed_asset', 'view') && (
-                    <Alert className="bg-orange-50 border-orange-200">
+                {overdueVerifications > 0 && hasPermission("finance.fixed_asset", "view") && (
+                    <Alert className="border-orange-200 bg-orange-50">
                         <AlertTriangle className="h-4 w-4 text-orange-600" />
                         <AlertDescription className="text-orange-900">
-                            <strong>{overdueVerifications} asset verification tasks</strong> are {t('overdue')}
-                            <Link to={createPageUrl('AssetVerification')} className="ml-2 underline font-semibold">
-                                View Verifications →
-                            </Link>
+                            <strong>{overdueVerifications} asset verification tasks</strong> are {t("overdue")}
+                            <Link to={createPageUrl("AssetVerification")} className="ml-2 font-semibold underline">View Verifications</Link>
                         </AlertDescription>
                     </Alert>
                 )}
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-                {hasPermission('finance.fixed_asset', 'view') && (
-                    <Link to={createPageUrl('FixedAssets')}>
-                        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                            <CardContent className="pt-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="bg-emerald-100 p-3 rounded-lg">
-                                        <Package2 className="w-6 h-6 text-emerald-600" />
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold">{t('fixedAssets')}</p>
-                                        <p className="text-sm text-gray-600">{activeAssets} {t('active')}</p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </Link>
-                )}
-
-                {hasPermission('sales.sales_order', 'view') && (
-                    <Link to={createPageUrl('Sales')}>
-                        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                            <CardContent className="pt-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="bg-blue-100 p-3 rounded-lg">
-                                        <ShoppingCart className="w-6 h-6 text-blue-600" />
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold">Sales Orders</p>
-                                        <p className="text-sm text-gray-600">{pendingSalesOrders} {t('pending')}</p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </Link>
-                )}
-
-                {hasPermission('maintenance.work_order', 'view') && (
-                    <Link to={createPageUrl('FixedAssets')}>
-                        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                            <CardContent className="pt-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="bg-yellow-100 p-3 rounded-lg">
-                                        <AlertTriangle className="w-6 h-6 text-yellow-600" />
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold">{t('maintenance')}</p>
-                                        <p className="text-sm text-gray-600">{overdueMaintenance} {t('overdue')}</p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </Link>
-                )}
-
-                <Link to={createPageUrl('Approvals')}>
-                    <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-4">
-                                <div className="bg-purple-100 p-3 rounded-lg">
-                                    <Clock className="w-6 h-6 text-purple-600" />
-                                </div>
-                                <div>
-                                    <p className="font-semibold">{t('approvals')}</p>
-                                    <p className="text-sm text-gray-600">{pendingApprovals} {t('pending')}</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </Link>
-
-                {hasPermission('finance.fixed_asset', 'view') && (
-                    <Link to={createPageUrl('AssetVerification')}>
-                        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                            <CardContent className="pt-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="bg-indigo-100 p-3 rounded-lg">
-                                        <CheckCircle2 className="w-6 h-6 text-indigo-600" />
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold">{t('assetVerification')}</p>
-                                        <p className="text-sm text-gray-600">{overdueVerifications} tasks</p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </Link>
-                )}
-
-                {isAdmin && (
-                    <Link to={createPageUrl('AdminCenter')}>
-                        <Card className="hover:shadow-lg transition-shadow cursor-pointer border-emerald-200">
-                            <CardContent className="pt-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="bg-emerald-100 p-3 rounded-lg">
-                                        <Shield className="w-6 h-6 text-emerald-600" />
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold">{t('adminCenter')}</p>
-                                        <p className="text-sm text-gray-600">System config</p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </Link>
-                )}
-            </div>
+            <ModuleCards
+                cards={[
+                    { title: "Sales", value: pendingSalesOrders, description: "Pending sales orders", icon: ShoppingCart, color: "indigo", to: "Sales" },
+                    { title: "Finance", value: formatSarM(totalNBV), description: "Net book value", icon: DollarSign, color: "blue", to: "Finance" },
+                    { title: "Assets", value: activeAssets, description: "Active fixed assets", icon: Package2, color: "emerald", to: "FixedAssets" },
+                    { title: "Approvals", value: pendingApprovals, description: "Pending approval requests", icon: Clock, color: "amber", to: "Approvals" },
+                    { title: "Admin Center", value: isAdmin ? "Open" : "Restricted", description: "System setup and access", icon: Shield, color: "slate", to: "AdminCenter" }
+                ]}
+            />
         </div>
     );
+}
+
+function SalesCards() {
+    const { data: quotations = [] } = useEntityList("Quotation", ["dashboard-quotations"], "-quotation_date");
+    const { data: orders = [] } = useEntityList("SalesOrder", ["dashboard-sales"], "-order_date");
+    const { data: deliveries = [] } = useEntityList("Delivery", ["dashboard-deliveries"], "-delivery_date");
+    const { data: invoices = [] } = useEntityList("Invoice", ["dashboard-invoices"], "-invoice_date");
+    const quotationList = toList(quotations);
+    const orderList = toList(orders);
+    const deliveryList = toList(deliveries);
+    const invoiceList = toList(invoices);
+
+    return <ModuleCards cards={[
+        { title: "Quotations", value: quotationList.length, description: `${quotationList.filter(q => q.status === "accepted" || q.status === "converted").length} accepted or converted`, icon: FileText, color: "blue", to: "Sales" },
+        { title: "Sales Orders", value: orderList.length, description: `${formatSar(sumBy(orderList, "total_amount"))} total order value`, icon: ShoppingCart, color: "indigo", to: "Sales" },
+        { title: "Deliveries", value: deliveryList.filter(d => d.status === "pending" || d.status === "in_transit").length, description: "Pending or in transit", icon: Truck, color: "amber", to: "Sales" },
+        { title: "Invoices", value: invoiceList.filter(i => i.payment_status === "unpaid" || i.payment_status === "overdue").length, description: "Unpaid or overdue", icon: Receipt, color: "red", to: "Sales" },
+        { title: "POS", value: "Open", description: "Point of sale workspace", icon: DollarSign, color: "emerald", to: "POS" },
+        { title: "Sales Reports", value: "Reports", description: "Sales analytics and exports", icon: BarChart3, color: "purple", to: "SalesReports" }
+    ]} />;
+}
+
+function FinanceCards() {
+    const { data: ar = [] } = useEntityList("AccountsReceivable", ["dashboard-ar"], "-invoice_date");
+    const { data: ap = [] } = useEntityList("AccountsPayable", ["dashboard-ap"], "-invoice_date");
+    const { data: payments = [] } = useEntityList("Payment", ["dashboard-payments"], "-payment_date");
+    const { data: assets = [] } = useEntityList("FixedAsset", ["dashboard-finance-assets"], "-acquisition_date");
+    const arList = toList(ar);
+    const apList = toList(ap);
+    const paymentList = toList(payments);
+    const assetList = toList(assets);
+
+    return <ModuleCards cards={[
+        { title: "Accounts Receivable", value: formatSar(sumBy(arList, "outstanding_amount")), description: `${arList.filter(x => x.status === "overdue").length} overdue records`, icon: TrendingUp, color: "blue", to: "Finance" },
+        { title: "Accounts Payable", value: formatSar(sumBy(apList, "outstanding_amount")), description: "Outstanding payable balance", icon: TrendingDown, color: "amber", to: "Finance" },
+        { title: "Payments", value: paymentList.length, description: "Payment records", icon: Receipt, color: "emerald", to: "Finance" },
+        { title: "Fixed Assets", value: formatSarM(sumBy(assetList, "net_book_value")), description: `${assetList.filter(a => a.status === "active").length} active assets`, icon: Building2, color: "indigo", to: "FixedAssets" },
+        { title: "Treasury", value: "Open", description: "Bank and cash management", icon: Landmark, color: "slate", to: "TreasuryManagement" },
+        { title: "Finance Reports", value: "Reports", description: "Statements and variance reports", icon: BarChart3, color: "purple", to: "FinancialReports" }
+    ]} />;
+}
+
+function InventoryCards() {
+    const { data: stock = [] } = useEntityList("StockLevel", ["dashboard-stock"], "-aging_days");
+    const { data: movements = [] } = useEntityList("StockMovement", ["dashboard-movements"], "-movement_date");
+    const { data: counts = [] } = useEntityList("CycleCount", ["dashboard-cycle-counts"], "-count_date");
+    const { data: inspections = [] } = useEntityList("InspectionLot", ["dashboard-inspections"], "-inspection_date");
+    const stockList = toList(stock);
+    const movementList = toList(movements);
+    const countList = toList(counts);
+    const inspectionList = toList(inspections);
+
+    return <ModuleCards cards={[
+        { title: "Stock Value", value: formatSar(sumBy(stockList, "total_value")), description: `${sumBy(stockList, "quantity").toLocaleString()} total quantity`, icon: Warehouse, color: "emerald", to: "Inventory" },
+        { title: "Low Stock", value: stockList.filter(s => (s.available_quantity || 0) <= 10).length, description: "Materials needing attention", icon: AlertTriangle, color: "red", to: "Inventory" },
+        { title: "Movements", value: movementList.length, description: "Stock movement records", icon: Truck, color: "blue", to: "Inventory" },
+        { title: "Cycle Counts", value: countList.filter(c => c.status === "in_progress" || c.status === "planned").length, description: "Planned or in progress", icon: Calculator, color: "amber", to: "Inventory" },
+        { title: "Quality Inspections", value: inspectionList.length, description: "Inspection lots", icon: CheckCircle2, color: "indigo", to: "Quality" },
+        { title: "Inventory Reports", value: "Reports", description: "Valuation and stock reports", icon: BarChart3, color: "purple", to: "InventoryReports" }
+    ]} />;
+}
+
+function OperationsCards() {
+    const { data: production = [] } = useEntityList("ProductionOrder", ["dashboard-production"], "-planned_start_date");
+    const { data: workOrders = [] } = useEntityList("WorkOrder", ["dashboard-work-orders"], "-scheduled_date");
+    const { data: equipment = [] } = useEntityList("Equipment", ["dashboard-equipment"]);
+    const { data: verifications = [] } = useEntityList("AssetVerificationTask", ["dashboard-asset-verification"], "-scheduled_date");
+
+    return <ModuleCards cards={[
+        { title: "Production Orders", value: toList(production).length, description: "Manufacturing workload", icon: Factory, color: "indigo", to: "Production" },
+        { title: "Work Orders", value: toList(workOrders).filter(w => w.status === "open" || w.status === "in_progress").length, description: "Open or in progress", icon: Settings, color: "amber", to: "Production" },
+        { title: "Equipment", value: toList(equipment).filter(e => e.status === "active").length, description: "Active equipment", icon: Database, color: "emerald", to: "Production" },
+        { title: "Asset Verification", value: toList(verifications).filter(v => v.status === "scheduled").length, description: "Scheduled verification tasks", icon: CheckCircle2, color: "blue", to: "AssetVerification" },
+        { title: "Manufacturing Reports", value: "Reports", description: "Production performance reports", icon: BarChart3, color: "purple", to: "ManufacturingReports" }
+    ]} />;
+}
+
+function SupplyChainCards() {
+    const { data: requisitions = [] } = useEntityList("PurchaseRequisition", ["dashboard-pr"], "-request_date");
+    const { data: orders = [] } = useEntityList("PurchaseOrder", ["dashboard-po"], "-order_date");
+    const { data: grn = [] } = useEntityList("GoodsReceiptNote", ["dashboard-grn"], "-receipt_date");
+    const { data: vendors = [] } = useEntityList("Vendor", ["dashboard-vendors"]);
+
+    return <ModuleCards cards={[
+        { title: "Purchase Requisitions", value: toList(requisitions).filter(r => r.status === "pending" || r.status === "submitted").length, description: "Waiting for processing", icon: FileText, color: "amber", to: "Purchasing" },
+        { title: "Purchase Orders", value: toList(orders).length, description: `${formatSar(sumBy(toList(orders), "total_amount"))} total value`, icon: ShoppingCart, color: "blue", to: "Purchasing" },
+        { title: "Goods Receipts", value: toList(grn).length, description: "Receipt documents", icon: Truck, color: "emerald", to: "Purchasing" },
+        { title: "Vendors", value: toList(vendors).length, description: "Vendor master records", icon: Building2, color: "indigo", to: "MasterDataManagement" },
+        { title: "Demand Planning", value: "Open", description: "Forecasting dashboard", icon: Target, color: "purple", to: "DemandPlanning" },
+        { title: "Supply Chain", value: "Open", description: "Supply chain overview", icon: TrendingUp, color: "slate", to: "SupplyChain" }
+    ]} />;
+}
+
+function HRCards() {
+    const { data: employees = [] } = useEntityList("Employee", ["dashboard-employees"]);
+    const { data: leave = [] } = useEntityList("LeaveRequest", ["dashboard-leave"], "-applied_date");
+    const { data: payroll = [] } = useEntityList("Payroll", ["dashboard-payroll"], "-payroll_month");
+    const { data: loans = [] } = useEntityList("LoanAdvance", ["dashboard-loans"], "-request_date");
+    const employeesList = toList(employees);
+
+    return <ModuleCards cards={[
+        { title: "Employees", value: employeesList.filter(e => e.employment_status === "active").length, description: `${employeesList.length} total employees`, icon: Users, color: "blue", to: "HR" },
+        { title: "Leave Requests", value: toList(leave).filter(l => l.status === "submitted").length, description: "Submitted for approval", icon: Clock, color: "amber", to: "HR" },
+        { title: "Payroll", value: toList(payroll).filter(p => p.status === "draft" || p.status === "calculated").length, description: "Draft or calculated payrolls", icon: DollarSign, color: "emerald", to: "HR" },
+        { title: "Loans & Advances", value: toList(loans).filter(l => l.status === "active").length, description: "Active employee loans", icon: Receipt, color: "indigo", to: "HR" },
+        { title: "HR Reports", value: "Reports", description: "Payroll and employee reporting", icon: BarChart3, color: "purple", to: "HRReports" }
+    ]} />;
+}
+
+function ProjectCards() {
+    const { data: projects = [] } = useEntityList("Project", ["dashboard-projects"], "-start_date");
+    const { data: tasks = [] } = useEntityList("ProjectTask", ["dashboard-project-tasks"], "-due_date");
+    const { data: milestones = [] } = useEntityList("ProjectMilestone", ["dashboard-project-milestones"], "-due_date");
+    const { data: expenses = [] } = useEntityList("ProjectExpense", ["dashboard-project-expenses"], "-expense_date");
+
+    return <ModuleCards cards={[
+        { title: "Projects", value: toList(projects).filter(p => p.status === "active" || p.status === "in_progress").length, description: "Active projects", icon: Briefcase, color: "blue", to: "Projects" },
+        { title: "Project Tasks", value: toList(tasks).filter(t => t.status !== "completed").length, description: "Open tasks", icon: CheckCircle2, color: "amber", to: "Projects" },
+        { title: "Milestones", value: toList(milestones).length, description: "Tracked milestones", icon: Target, color: "indigo", to: "Projects" },
+        { title: "Project Expenses", value: formatSar(sumBy(toList(expenses), "amount")), description: "Recorded project expenses", icon: DollarSign, color: "emerald", to: "Projects" }
+    ]} />;
+}
+
+function ComplianceCards() {
+    const { data: zatca = [] } = useEntityList("ZATCASubmissionLog", ["dashboard-zatca"], "-submission_date");
+    const { data: vat = [] } = useEntityList("VATReturn", ["dashboard-vat"], "-period_end");
+    const { data: zakat = [] } = useEntityList("ZakatComputation", ["dashboard-zakat"], "-period_end");
+
+    return <ModuleCards cards={[
+        { title: "ZATCA Submissions", value: toList(zatca).length, description: `${toList(zatca).filter(z => z.status === "failed").length} failed submissions`, icon: FileCheck, color: "blue", to: "ZATCA" },
+        { title: "VAT Returns", value: toList(vat).length, description: "VAT return records", icon: Receipt, color: "emerald", to: "ComplianceReports" },
+        { title: "Zakat Computations", value: toList(zakat).length, description: "Zakat calculation records", icon: Calculator, color: "amber", to: "ZakatManagement" },
+        { title: "Compliance Reports", value: "Reports", description: "Regulatory reporting center", icon: BarChart3, color: "purple", to: "ComplianceReports" }
+    ]} />;
+}
+
+function ReportsCards() {
+    return <ModuleCards cards={[
+        { title: "Management Reports", value: "Open", description: "Main reporting center", icon: BarChart3, color: "blue", to: "Reports" },
+        { title: "Sales Reports", value: "Open", description: "Revenue and order reports", icon: ShoppingCart, color: "indigo", to: "SalesReports" },
+        { title: "Financial Reports", value: "Open", description: "Statements and ledgers", icon: DollarSign, color: "emerald", to: "FinancialReports" },
+        { title: "Inventory Reports", value: "Open", description: "Stock and valuation reports", icon: Warehouse, color: "amber", to: "InventoryReports" },
+        { title: "Manufacturing Reports", value: "Open", description: "Production reports", icon: Factory, color: "purple", to: "ManufacturingReports" },
+        { title: "HR Reports", value: "Open", description: "Employee and payroll reports", icon: Users, color: "slate", to: "HRReports" }
+    ]} />;
+}
+
+function WorkflowCards() {
+    const { data: approvals = [] } = useEntityList("ApprovalRequest", ["dashboard-workflow-approvals"], "-created_date");
+    const { data: matrix = [] } = useEntityList("ApprovalMatrix", ["dashboard-approval-matrix"]);
+
+    return <ModuleCards cards={[
+        { title: "Pending Approvals", value: toList(approvals).filter(a => a.status === "pending").length, description: "Awaiting review", icon: Clock, color: "amber", to: "Approvals" },
+        { title: "Approval Requests", value: toList(approvals).length, description: "Total workflow requests", icon: FileCheck, color: "blue", to: "Approvals" },
+        { title: "Approval Matrix", value: toList(matrix).length, description: "Configured approval rules", icon: Shield, color: "indigo", to: "ApprovalWorkflows" }
+    ]} />;
+}
+
+function AdministrationCards() {
+    const { data: organizations = [] } = useEntityList("Organization", ["dashboard-organizations"]);
+    const { data: plants = [] } = useEntityList("Plant", ["dashboard-plants"]);
+    const { data: roles = [] } = useEntityList("Role", ["dashboard-roles"]);
+    const { data: users = [] } = useEntityList("User", ["dashboard-users"]);
+
+    return <ModuleCards cards={[
+        { title: "Organizations", value: toList(organizations).length, description: "Company setup records", icon: Building2, color: "blue", to: "AdminCenter" },
+        { title: "Plants", value: toList(plants).length, description: "Plant master records", icon: Factory, color: "indigo", to: "AdminCenter" },
+        { title: "Roles", value: toList(roles).length, description: "Security roles", icon: Shield, color: "amber", to: "AdminCenter" },
+        { title: "Users", value: toList(users).length, description: "Application users", icon: Users, color: "emerald", to: "AdminCenter" },
+        { title: "Master Data", value: "Open", description: "Core master data setup", icon: Database, color: "purple", to: "MasterDataManagement" },
+        { title: "AI Assistant", value: "Open", description: "Management assistant", icon: Bot, color: "slate", to: "AIAssistant" }
+    ]} />;
 }
 
 export default function Dashboard() {
     const { t } = useLanguage();
     const [activeTab, setActiveTab] = useState("overview");
     const dashboardTabs = useMemo(() => ([
-        { value: "overview", label: "Overview", components: [
-            { name: "Dashboard Overview", Component: DashboardOverview },
-            { name: "Analytics", Component: Analytics },
-            { name: "AI Assistant", Component: AIAssistant },
-            { name: "KPI Dashboard", Component: KPIDashboard }
-        ] },
-        { value: "sales", label: "Sales", components: [
-            { name: "Sales", Component: Sales },
-            { name: "Point of Sale", Component: POS },
-            { name: "Sales Reports", Component: SalesReports }
-        ] },
-        { value: "inventory", label: "Inventory & Quality", components: [
-            { name: "Inventory", Component: Inventory },
-            { name: "Coil Management", Component: CoilManagement },
-            { name: "Quality", Component: Quality },
-            { name: "Inventory Reports", Component: InventoryReports },
-            { name: "Quality Maintenance Reports", Component: QualityMaintenanceReports }
-        ] },
-        { value: "operations", label: "Operations", components: [
-            { name: "Production", Component: Production },
-            { name: "Manufacturing Reports", Component: ManufacturingReports },
-            { name: "Asset Scanner", Component: AssetScanner },
-            { name: "Asset Verification", Component: AssetVerification }
-        ] },
-        { value: "supply-chain", label: "Supply Chain", components: [
-            { name: "Purchasing", Component: Purchasing },
-            { name: "Supply Chain", Component: SupplyChain },
-            { name: "Demand Planning", Component: DemandPlanning }
-        ] },
-        { value: "finance", label: "Finance", components: [
-            { name: "Finance", Component: Finance },
-            { name: "Costing", Component: Costing },
-            { name: "Treasury Management", Component: TreasuryManagement },
-            { name: "Budget Management", Component: BudgetManagement },
-            { name: "Fixed Assets", Component: FixedAssets },
-            { name: "Asset Lifecycle", Component: AssetLifecycle },
-            { name: "Depreciation Reports", Component: DepreciationReports },
-            { name: "Financial Reports", Component: FinancialReports },
-            { name: "Zakat Management", Component: ZakatManagement }
-        ] },
-        { value: "projects", label: "Projects", components: [{ name: "Projects", Component: Projects }] },
-        { value: "hr", label: "HR", components: [
-            { name: "HR", Component: HR },
-            { name: "HR Reports", Component: HRReports }
-        ] },
-        { value: "compliance", label: "Compliance", components: [
-            { name: "ZATCA", Component: ZATCA },
-            { name: "Compliance Reports", Component: ComplianceReports },
-            { name: "IT Security Reports", Component: ITSecurityReports }
-        ] },
-        { value: "reports", label: "Reports", components: [
-            { name: "Reports", Component: Reports },
-            { name: "Sales Reports", Component: SalesReports },
-            { name: "Financial Reports", Component: FinancialReports },
-            { name: "Inventory Reports", Component: InventoryReports },
-            { name: "Manufacturing Reports", Component: ManufacturingReports },
-            { name: "HR Reports", Component: HRReports },
-            { name: "Compliance Reports", Component: ComplianceReports },
-            { name: "Quality Maintenance Reports", Component: QualityMaintenanceReports },
-            { name: "Depreciation Reports", Component: DepreciationReports }
-        ] },
-        { value: "workflow", label: "Workflow", components: [
-            { name: "Approvals", Component: Approvals },
-            { name: "Approval Workflows", Component: ApprovalWorkflows }
-        ] },
-        { value: "administration", label: "Administration", components: [
-            { name: "Master Data Management", Component: MasterDataManagement },
-            { name: "Admin Center", Component: AdminCenter },
-            { name: "Integrations", Component: Integrations },
-            { name: "Notifications", Component: Notifications }
-        ] }
+        { value: "overview", label: "Overview", Component: OverviewCards },
+        { value: "sales", label: "Sales", Component: SalesCards },
+        { value: "inventory", label: "Inventory & Quality", Component: InventoryCards },
+        { value: "operations", label: "Operations", Component: OperationsCards },
+        { value: "supply-chain", label: "Supply Chain", Component: SupplyChainCards },
+        { value: "finance", label: "Finance", Component: FinanceCards },
+        { value: "projects", label: "Projects", Component: ProjectCards },
+        { value: "hr", label: "HR", Component: HRCards },
+        { value: "compliance", label: "Compliance", Component: ComplianceCards },
+        { value: "reports", label: "Reports", Component: ReportsCards },
+        { value: "workflow", label: "Workflow", Component: WorkflowCards },
+        { value: "administration", label: "Administration", Component: AdministrationCards }
     ]), []);
 
     const activeModule = dashboardTabs.find(tab => tab.value === activeTab) || dashboardTabs[0];
+    const ActiveComponent = activeModule.Component;
 
     return (
-        <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+        <div className="space-y-4 p-4 md:space-y-6 md:p-6">
             <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{t('dashboard')}</h1>
-                <p className="text-sm md:text-base text-gray-600 mt-1">
-                    Central access to every HORIZON module, dashboard card, chart, and report.
+                <h1 className="text-2xl font-bold text-gray-900 md:text-3xl">{t("dashboard")}</h1>
+                <p className="mt-1 text-sm text-gray-600 md:text-base">
+                    Management overview by module. Use the cards to review status and open the working screens when needed.
                 </p>
             </div>
 
@@ -434,7 +401,7 @@ export default function Dashboard() {
                 </div>
 
                 <TabsContent value={activeModule.value} className="mt-0">
-                    <ModulePanel components={activeModule.components} />
+                    <ActiveComponent />
                 </TabsContent>
             </Tabs>
         </div>
