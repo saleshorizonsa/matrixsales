@@ -7,6 +7,13 @@ import { isMatrixSalesAdminEmail } from '@/lib/adminAccess';
 
 const AuthContext = createContext();
 
+const getSupabaseRedirectUrl = () => {
+  const configuredUrl = import.meta.env.VITE_SUPABASE_AUTH_REDIRECT_URL;
+  if (configuredUrl) return configuredUrl;
+  if (typeof window === 'undefined') return undefined;
+  return window.location.origin;
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -218,6 +225,7 @@ export const AuthProvider = ({ children }) => {
       email,
       password,
       options: {
+        emailRedirectTo: getSupabaseRedirectUrl(),
         data: {
           full_name: fullName
         }
