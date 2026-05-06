@@ -1,7 +1,7 @@
 {
-  "name": "MatrixSales",
-  "short_name": "MatrixSales",
-  "description": "MatrixSales enterprise operations workspace",
+  "name": "HORIZON",
+  "short_name": "HORIZON",
+  "description": "HORIZON enterprise operations workspace",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

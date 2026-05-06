@@ -181,8 +181,8 @@ export const translations = {
         operationFailed: "Operation failed",
         
         // Company
-        companyName: "MatrixERP",
-        companyTagline: "Enterprise Solution",
+        companyName: "HORIZON",
+        companyTagline: "Powering Your Digital Future",
 
         // Projects
         projectsServices: "Projects & Services",
@@ -805,8 +805,8 @@ export const translations = {
         operationFailed: "فشلت العملية",
         
         // Company
-        companyName: "ماتريكس إي آر بي",
-        companyTagline: "حل متكامل للمؤسسات",
+        companyName: "HORIZON",
+        companyTagline: "Powering Your Digital Future",
 
         // Projects
         projectsServices: "المشاريع والخدمات",

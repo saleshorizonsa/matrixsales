@@ -44,6 +44,7 @@ import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 import QuickActionSheet from "@/components/mobile/QuickActionSheet";
 import OfflineIndicator from "@/components/mobile/OfflineIndicator";
 import { useAuth } from "@/lib/AuthContext";
+import BrandLogo from "@/components/BrandLogo";
 
 function LayoutContent({ children, currentPageName }) {
     const [showQuickAction, setShowQuickAction] = React.useState(false);
@@ -148,10 +149,10 @@ function LayoutContent({ children, currentPageName }) {
                                     <Link
                                         key={item.path}
                                         to={createPageUrl(item.path)}
-                                        className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${
+                                        className={`flex items-center gap-3 rounded-lg px-4 py-2.5 transition-colors ${
                                             isActive
-                                                ? "bg-emerald-600 text-white"
-                                                : "text-gray-700 hover:bg-gray-100"
+                                                ? "bg-[#24466f] text-white shadow-sm"
+                                                : "text-slate-700 hover:bg-[#eef3f9] hover:text-[#24466f]"
                                         }`}
                                     >
                                         <Icon className="w-5 h-5" />
@@ -167,25 +168,21 @@ function LayoutContent({ children, currentPageName }) {
     );
 
     return (
-        <div className={`min-h-screen bg-gray-50 ${isRTL ? 'rtl' : 'ltr'}`} dir={isRTL ? 'rtl' : 'ltr'}>
+        <div className={`min-h-screen bg-[#f5f7fb] ${isRTL ? 'rtl' : 'ltr'}`} dir={isRTL ? 'rtl' : 'ltr'}>
             <aside className={`hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col ${isRTL ? 'lg:right-0' : 'lg:left-0'}`}>
-                <div className="flex flex-col flex-grow bg-white border-r overflow-y-auto">
-                    <div className="flex items-center gap-3 px-6 py-6 border-b">
-                        <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 p-2 rounded-lg">
-                            <BarChart3 className="w-6 h-6 text-white" />
-                        </div>
-                        <div className="flex-1">
-                            <h1 className="text-xl font-bold text-gray-900">{t('companyName')}</h1>
-                            <p className="text-xs text-gray-600">{t('companyTagline')}</p>
+                <div className="flex flex-grow flex-col overflow-y-auto border-r border-slate-200 bg-white shadow-xl shadow-slate-200/60">
+                    <div className="border-b border-slate-100 px-5 py-5">
+                        <div className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-100">
+                            <BrandLogo imageClassName="h-14" />
                         </div>
                     </div>
                     
-                    <div className="px-4 py-3 border-b">
+                    <div className="border-b border-slate-100 px-4 py-3">
                         <Button
                             onClick={toggleLanguage}
                             variant="outline"
                             size="sm"
-                            className="w-full justify-start gap-2"
+                            className="w-full justify-start gap-2 border-slate-200 bg-[#f8fafc]"
                         >
                             <Languages className="w-4 h-4" />
                             <span className="flex-1 text-start">{language === 'en' ? 'العربية' : 'English'}</span>
@@ -204,20 +201,15 @@ function LayoutContent({ children, currentPageName }) {
                         </Button>
                     </div>
 
-                    <nav className="flex-1 py-6 overflow-y-auto">
+                    <nav className="flex-1 overflow-y-auto py-5">
                         <NavContent />
                     </nav>
                 </div>
             </aside>
 
-            <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b">
+            <div className="fixed left-0 right-0 top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur lg:hidden">
                 <div className="flex items-center justify-between px-4 py-4">
-                    <div className="flex items-center gap-3">
-                        <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 p-2 rounded-lg">
-                            <BarChart3 className="w-5 h-5 text-white" />
-                        </div>
-                        <h1 className="text-lg font-bold text-gray-900">{t('companyName')}</h1>
-                    </div>
+                    <BrandLogo imageClassName="h-10" />
                     
                     <div className="flex items-center gap-2">
                         <NotificationBell />
@@ -266,8 +258,8 @@ function LayoutContent({ children, currentPageName }) {
             </div>
 
             <main className={`lg:pt-0 pt-16 ${isRTL ? 'lg:pr-64' : 'lg:pl-64'}`}>
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
-                    <div className="sticky top-16 lg:top-0 z-40 bg-white border-b px-6 py-3 shadow-sm">
+                <div className="min-h-screen bg-[#f5f7fb]">
+                    <div className="sticky top-16 z-40 border-b border-slate-200 bg-white/90 px-6 py-3 shadow-sm backdrop-blur lg:top-0">
                         <Button
                             onClick={() => navigate(-1)}
                             variant="outline"
