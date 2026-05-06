@@ -2,6 +2,8 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { matrixSales } from '@/api/matrixSalesClient';
 import { appParams } from '@/lib/app-params';
 import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
+import { supabase } from '@/lib/supabaseClient';
+import { isMatrixSalesAdminEmail } from '@/lib/adminAccess';
 
 const AuthContext = createContext();
 
@@ -18,6 +20,12 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const checkAppState = async () => {
+    if (!appParams.appId) {
+      await checkSupabaseAuth();
+      setIsLoadingPublicSettings(false);
+      return;
+    }
+
     try {
       setIsLoadingPublicSettings(true);
       setAuthError(null);
@@ -87,6 +95,44 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const toMatrixSalesUser = (supabaseUser) => ({
+    id: supabaseUser.id,
+    email: supabaseUser.email,
+    full_name: supabaseUser.user_metadata?.full_name || supabaseUser.email,
+    role: isMatrixSalesAdminEmail(
+      supabaseUser.email,
+      import.meta.env.VITE_MATRIXSALES_ADMIN_EMAILS || ''
+    ) ? 'admin' : 'user',
+    assigned_roles: []
+  });
+
+  const checkSupabaseAuth = async () => {
+    try {
+      setIsLoadingAuth(true);
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error) throw error;
+
+      if (data.session?.user) {
+        setUser(toMatrixSalesUser(data.session.user));
+        setIsAuthenticated(true);
+      } else {
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+    } catch (error) {
+      console.error('Supabase auth check failed:', error);
+      setUser(null);
+      setIsAuthenticated(false);
+      setAuthError({
+        type: 'auth_required',
+        message: error.message || 'Authentication required'
+      });
+    } finally {
+      setIsLoadingAuth(false);
+    }
+  };
+
   const checkUserAuth = async () => {
     try {
       // Now check if the user is authenticated
@@ -113,6 +159,11 @@ export const AuthProvider = ({ children }) => {
   const logout = (shouldRedirect = true) => {
     setUser(null);
     setIsAuthenticated(false);
+
+    if (!appParams.appId) {
+      supabase.auth.signOut();
+      return;
+    }
     
     if (shouldRedirect) {
       // Use the SDK's logout method which handles token cleanup and redirect
@@ -124,8 +175,43 @@ export const AuthProvider = ({ children }) => {
   };
 
   const navigateToLogin = () => {
+    if (!appParams.appId) return;
+
     // Use the SDK's redirectToLogin method
     matrixSales.auth.redirectToLogin(window.location.href);
+  };
+
+  const signInWithPassword = async ({ email, password }) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) throw error;
+    if (data.user) {
+      setUser(toMatrixSalesUser(data.user));
+      setIsAuthenticated(true);
+    }
+    return data;
+  };
+
+  const signUpWithPassword = async ({ email, password, fullName }) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName
+        }
+      }
+    });
+
+    if (error) throw error;
+    if (data.user) {
+      setUser(toMatrixSalesUser(data.user));
+      setIsAuthenticated(!!data.session);
+    }
+    return data;
   };
 
   return (
@@ -138,6 +224,9 @@ export const AuthProvider = ({ children }) => {
       appPublicSettings,
       logout,
       navigateToLogin,
+      signInWithPassword,
+      signUpWithPassword,
+      authProvider: appParams.appId ? 'matrixSales' : 'supabase',
       checkAppState
     }}>
       {children}

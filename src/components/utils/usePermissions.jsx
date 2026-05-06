@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { matrixSales } from '@/api/matrixSalesClient';
-
-const MATRIXSALES_FULL_ADMIN_EMAILS = ['shareef6695@gmail.com'];
+import { supabase } from '@/lib/supabaseClient';
+import { isMatrixSalesAdminEmail } from '@/lib/adminAccess';
 
 /**
  * Custom hook to check user permissions
@@ -17,15 +17,36 @@ export function usePermissions() {
     useEffect(() => {
         const fetchUserAndRoles = async () => {
             try {
-                const user = await matrixSales.auth.me();
+                let user = null;
+                try {
+                    user = await matrixSales.auth.me();
+                } catch {
+                    const { data } = await supabase.auth.getUser();
+                    user = data.user ? {
+                        id: data.user.id,
+                        email: data.user.email,
+                        full_name: data.user.user_metadata?.full_name || data.user.email,
+                        role: isMatrixSalesAdminEmail(
+                            data.user.email,
+                            import.meta.env.VITE_MATRIXSALES_ADMIN_EMAILS || ''
+                        ) ? 'admin' : 'user',
+                        assigned_roles: []
+                    } : null;
+                }
+
+                if (!user) {
+                    setCurrentUser(null);
+                    setUserRoles([]);
+                    setIsBootstrapAdmin(false);
+                    return;
+                }
+
                 setCurrentUser(user);
 
-                const configuredAdminEmails = (import.meta.env.VITE_MATRIXSALES_ADMIN_EMAILS || '')
-                    .split(',')
-                    .map(email => email.trim().toLowerCase())
-                    .filter(Boolean);
-                const fullAdminEmails = [...MATRIXSALES_FULL_ADMIN_EMAILS, ...configuredAdminEmails];
-                const isConfiguredAdmin = fullAdminEmails.includes(user.email?.toLowerCase());
+                const isConfiguredAdmin = isMatrixSalesAdminEmail(
+                    user.email,
+                    import.meta.env.VITE_MATRIXSALES_ADMIN_EMAILS || ''
+                );
 
                 if (user.role === 'admin' || isConfiguredAdmin) {
                     setIsBootstrapAdmin(isConfiguredAdmin);
@@ -162,10 +183,24 @@ export function PermissionGate({ module, action, children, fallback = null }) {
  */
 export async function checkPermission(module, action) {
     try {
-        const user = await matrixSales.auth.me();
+        let user = null;
+        try {
+            user = await matrixSales.auth.me();
+        } catch {
+            const { data } = await supabase.auth.getUser();
+            user = data.user ? {
+                email: data.user.email,
+                role: isMatrixSalesAdminEmail(
+                    data.user.email,
+                    import.meta.env.VITE_MATRIXSALES_ADMIN_EMAILS || ''
+                ) ? 'admin' : 'user'
+            } : null;
+        }
+
+        if (!user) return false;
         
         // Admins have all permissions
-        if (user.role === 'admin' || MATRIXSALES_FULL_ADMIN_EMAILS.includes(user.email?.toLowerCase())) return true;
+        if (user.role === 'admin' || isMatrixSalesAdminEmail(user.email, import.meta.env.VITE_MATRIXSALES_ADMIN_EMAILS || '')) return true;
 
         // Fetch user's roles
         if (!user.assigned_roles || user.assigned_roles.length === 0) return false;

@@ -1,8 +1,73 @@
-import React from 'react';
-import { BarChart3, LogIn, ShieldCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { BarChart3, LogIn, ShieldCheck, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/components/ui/use-toast';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function LoginScreen({ onLogin }) {
+  const { authProvider, signInWithPassword, signUpWithPassword } = useAuth();
+  const { toast } = useToast();
+  const [mode, setMode] = useState('signin');
+  const [formData, setFormData] = useState({
+    fullName: '',
+    email: '',
+    password: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    if (authProvider !== 'supabase') {
+      onLogin();
+      return;
+    }
+
+    if (!formData.email || !formData.password || (mode === 'signup' && !formData.fullName)) {
+      toast({
+        title: 'Missing details',
+        description: 'Complete the required sign-in fields.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      if (mode === 'signup') {
+        await signUpWithPassword({
+          email: formData.email.trim().toLowerCase(),
+          password: formData.password,
+          fullName: formData.fullName.trim()
+        });
+        toast({
+          title: 'Account created',
+          description: 'Check your email if confirmation is required, then sign in.'
+        });
+        setMode('signin');
+      } else {
+        await signInWithPassword({
+          email: formData.email.trim().toLowerCase(),
+          password: formData.password
+        });
+      }
+    } catch (error) {
+      toast({
+        title: mode === 'signup' ? 'Sign up failed' : 'Sign in failed',
+        description: error.message || 'Unable to authenticate.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto flex min-h-screen w-full max-w-6xl items-center px-6 py-10">
@@ -39,10 +104,64 @@ export default function LoginScreen({ onLogin }) {
               </div>
             </div>
 
-            <Button onClick={onLogin} className="h-11 w-full bg-emerald-600 hover:bg-emerald-700">
-              <LogIn className="mr-2 h-4 w-4" />
-              Sign In
-            </Button>
+            {authProvider === 'supabase' ? (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {mode === 'signup' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="full-name">Full Name</Label>
+                    <Input
+                      id="full-name"
+                      value={formData.fullName}
+                      onChange={(event) => handleChange('fullName', event.target.value)}
+                      placeholder="Your full name"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(event) => handleChange('email', event.target.value)}
+                    placeholder="you@company.com"
+                    autoComplete="email"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={formData.password}
+                    onChange={(event) => handleChange('password', event.target.value)}
+                    placeholder="Password"
+                    autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                  />
+                </div>
+
+                <Button type="submit" disabled={isSubmitting} className="h-11 w-full bg-emerald-600 hover:bg-emerald-700">
+                  {mode === 'signup' ? <UserPlus className="mr-2 h-4 w-4" /> : <LogIn className="mr-2 h-4 w-4" />}
+                  {isSubmitting ? 'Please wait...' : mode === 'signup' ? 'Create Account' : 'Sign In'}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => setMode(mode === 'signup' ? 'signin' : 'signup')}
+                >
+                  {mode === 'signup' ? 'Use an existing account' : 'Create a new account'}
+                </Button>
+              </form>
+            ) : (
+              <Button onClick={onLogin} className="h-11 w-full bg-emerald-600 hover:bg-emerald-700">
+                <LogIn className="mr-2 h-4 w-4" />
+                Sign In
+              </Button>
+            )}
 
             <p className="mt-4 text-center text-xs text-slate-500">
               Contact your administrator if your account has not been invited.
