@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Shield, Users, Building, Rocket, Factory, MapPin, Ruler } from "lucide-react";
+import { Shield, Users, Building, Factory, MapPin, Ruler } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -12,7 +12,6 @@ import UnitConversionForm from "../components/admin/UnitConversionForm";
 import OrganizationSetupForm from "../components/admin/OrganizationSetupForm";
 import RoleManagement from "../components/admin/RoleManagement";
 import UserRoleAssignment from "../components/admin/UserRoleAssignment";
-import GoLiveChecklist from "../components/shared/GoLiveChecklist";
 import ConfirmDialog from "../components/shared/ConfirmDialog";
 import { usePermissions } from "../components/utils/usePermissions";
 import { Lock } from "lucide-react";
@@ -20,7 +19,7 @@ import DataTable from "../components/erp/DataTable";
 import { useToast } from "@/components/ui/use-toast";
 
 export default function AdminCenter() {
-    const [activeTab, setActiveTab] = useState("golive");
+    const [activeTab, setActiveTab] = useState("roles");
     const [showPlantForm, setShowPlantForm] = useState(false);
     const [showStorageLocationForm, setShowStorageLocationForm] = useState(false);
     const [editingPlant, setEditingPlant] = useState(null);
@@ -264,11 +263,7 @@ export default function AdminCenter() {
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <TabsList className="grid grid-cols-7 w-full">
-                    <TabsTrigger value="golive">
-                        <Rocket className="w-4 h-4 mr-2" />
-                        Go-Live
-                    </TabsTrigger>
+                <TabsList className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 w-full h-auto">
                     <TabsTrigger value="roles">
                         <Shield className="w-4 h-4 mr-2" />
                         Roles
@@ -294,10 +289,6 @@ export default function AdminCenter() {
                         Storage Location
                     </TabsTrigger>
                 </TabsList>
-
-                <TabsContent value="golive">
-                    <GoLiveChecklist />
-                </TabsContent>
 
                 <TabsContent value="roles">
                     <RoleManagement />

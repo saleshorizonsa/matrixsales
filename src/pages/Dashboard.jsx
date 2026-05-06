@@ -1,9 +1,9 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import { matrixSales } from "@/api/matrixSalesClient";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
     Package2, 
     TrendingDown, 
@@ -11,8 +11,6 @@ import {
     AlertTriangle,
     CheckCircle2,
     Clock,
-    ArrowRight,
-    Rocket,
     Shield
 } from "lucide-react";
 import StatCard from "@/components/erp/StatCard";
@@ -21,8 +19,58 @@ import { createPageUrl } from "@/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { usePermissions } from "@/components/utils/usePermissions";
 import { useLanguage } from "@/components/utils/languageContext";
+import AdminCenter from "./AdminCenter";
+import AIAssistant from "./AIAssistant";
+import Analytics from "./Analytics";
+import ApprovalWorkflows from "./ApprovalWorkflows";
+import Approvals from "./Approvals";
+import AssetLifecycle from "./AssetLifecycle";
+import AssetScanner from "./AssetScanner";
+import AssetVerification from "./AssetVerification";
+import BudgetManagement from "./BudgetManagement";
+import CoilManagement from "./CoilManagement";
+import ComplianceReports from "./ComplianceReports";
+import Costing from "./Costing";
+import DemandPlanning from "./DemandPlanning";
+import DepreciationReports from "./DepreciationReports";
+import Finance from "./Finance";
+import FinancialReports from "./FinancialReports";
+import FixedAssets from "./FixedAssets";
+import HR from "./HR";
+import HRReports from "./HRReports";
+import ITSecurityReports from "./ITSecurityReports";
+import Integrations from "./Integrations";
+import Inventory from "./Inventory";
+import InventoryReports from "./InventoryReports";
+import KPIDashboard from "./KPIDashboard";
+import ManufacturingReports from "./ManufacturingReports";
+import MasterDataManagement from "./MasterDataManagement";
+import Notifications from "./Notifications";
+import POS from "./POS";
+import Production from "./Production";
+import Projects from "./Projects";
+import Purchasing from "./Purchasing";
+import Quality from "./Quality";
+import QualityMaintenanceReports from "./QualityMaintenanceReports";
+import Reports from "./Reports";
+import Sales from "./Sales";
+import SalesReports from "./SalesReports";
+import SupplyChain from "./SupplyChain";
+import TreasuryManagement from "./TreasuryManagement";
+import ZakatManagement from "./ZakatManagement";
+import ZATCA from "./ZATCA";
 
-export default function Dashboard() {
+const ModulePanel = ({ components }) => (
+    <div className="space-y-6">
+        {components.map(({ name, Component }) => (
+            <section key={name}>
+                <Component />
+            </section>
+        ))}
+    </div>
+);
+
+function DashboardOverview() {
     const { isAdmin, hasPermission, getRoleNames } = usePermissions();
     const { t } = useLanguage();
 
@@ -56,62 +104,40 @@ export default function Dashboard() {
         initialData: []
     });
 
-    const activeAssets = assets.filter(a => a.status === 'active').length;
-    const totalAssetValue = assets.reduce((sum, a) => sum + (a.acquisition_cost || 0), 0);
-    const totalNBV = assets.reduce((sum, a) => sum + (a.net_book_value || 0), 0);
+    const assetList = Array.isArray(assets) ? assets : [];
+    const salesOrderList = Array.isArray(salesOrders) ? salesOrders : [];
+    const maintenanceList = Array.isArray(maintenance) ? maintenance : [];
+    const approvalRequestList = Array.isArray(approvalRequests) ? approvalRequests : [];
+    const verificationTaskList = Array.isArray(verificationTasks) ? verificationTasks : [];
+
+    const activeAssets = assetList.filter(a => a.status === 'active').length;
+    const totalAssetValue = assetList.reduce((sum, a) => sum + (a.acquisition_cost || 0), 0);
+    const totalNBV = assetList.reduce((sum, a) => sum + (a.net_book_value || 0), 0);
     
-    const pendingSalesOrders = salesOrders.filter(o => 
+    const pendingSalesOrders = salesOrderList.filter(o =>
         o.status === 'pending_approval' || o.status === 'draft'
     ).length;
-    
-    const overdueMaintenance = maintenance.filter(m => 
+
+    const overdueMaintenance = maintenanceList.filter(m =>
         m.status === 'scheduled' && new Date(m.scheduled_date) < new Date()
     ).length;
 
-    const pendingApprovals = approvalRequests.filter(a => a.status === 'pending').length;
-    
-    const overdueVerifications = verificationTasks.filter(t => 
+    const pendingApprovals = approvalRequestList.filter(a => a.status === 'pending').length;
+
+    const overdueVerifications = verificationTaskList.filter(t =>
         t.status === 'scheduled' && new Date(t.scheduled_date) < new Date()
     ).length;
 
     return (
-        <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-            <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{t('dashboard')}</h1>
-                <p className="text-sm md:text-base text-gray-600 mt-1">Welcome to your ERP System</p>
-                {!isAdmin && getRoleNames().length > 0 && (
-                    <div className="flex gap-2 mt-2">
-                        {getRoleNames().map((roleName, idx) => (
-                            <Badge key={idx} variant="outline">
-                                {roleName}
-                            </Badge>
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            {isAdmin && (
-                <Card className="border-emerald-300 bg-gradient-to-r from-emerald-50 to-green-50">
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="flex items-center gap-2">
-                                <Rocket className="w-5 h-5 text-emerald-600" />
-                                Go-Live Preparation
-                            </CardTitle>
-                            <Link to={createPageUrl('AdminCenter')}>
-                                <Button size="sm" variant="outline">
-                                    View Full Checklist
-                                    <ArrowRight className="w-4 h-4 ml-2" />
-                                </Button>
-                            </Link>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-sm text-gray-700">
-                            Complete the setup checklist in Admin Center before going live with the system.
-                        </p>
-                    </CardContent>
-                </Card>
+        <div className="space-y-4 md:space-y-6">
+            {!isAdmin && getRoleNames().length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                    {getRoleNames().map((roleName, idx) => (
+                        <Badge key={idx} variant="outline">
+                            {roleName}
+                        </Badge>
+                    ))}
+                </div>
             )}
 
             <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
@@ -231,7 +257,7 @@ export default function Dashboard() {
                 )}
 
                 {hasPermission('maintenance.work_order', 'view') && (
-                    <Link to={createPageUrl('Maintenance')}>
+                    <Link to={createPageUrl('FixedAssets')}>
                         <Card className="hover:shadow-lg transition-shadow cursor-pointer">
                             <CardContent className="pt-6">
                                 <div className="flex items-center gap-4">
@@ -300,6 +326,117 @@ export default function Dashboard() {
                     </Link>
                 )}
             </div>
+        </div>
+    );
+}
+
+export default function Dashboard() {
+    const { t } = useLanguage();
+    const [activeTab, setActiveTab] = useState("overview");
+    const dashboardTabs = useMemo(() => ([
+        { value: "overview", label: "Overview", components: [
+            { name: "Dashboard Overview", Component: DashboardOverview },
+            { name: "Analytics", Component: Analytics },
+            { name: "AI Assistant", Component: AIAssistant },
+            { name: "KPI Dashboard", Component: KPIDashboard }
+        ] },
+        { value: "sales", label: "Sales", components: [
+            { name: "Sales", Component: Sales },
+            { name: "Point of Sale", Component: POS },
+            { name: "Sales Reports", Component: SalesReports }
+        ] },
+        { value: "inventory", label: "Inventory & Quality", components: [
+            { name: "Inventory", Component: Inventory },
+            { name: "Coil Management", Component: CoilManagement },
+            { name: "Quality", Component: Quality },
+            { name: "Inventory Reports", Component: InventoryReports },
+            { name: "Quality Maintenance Reports", Component: QualityMaintenanceReports }
+        ] },
+        { value: "operations", label: "Operations", components: [
+            { name: "Production", Component: Production },
+            { name: "Manufacturing Reports", Component: ManufacturingReports },
+            { name: "Asset Scanner", Component: AssetScanner },
+            { name: "Asset Verification", Component: AssetVerification }
+        ] },
+        { value: "supply-chain", label: "Supply Chain", components: [
+            { name: "Purchasing", Component: Purchasing },
+            { name: "Supply Chain", Component: SupplyChain },
+            { name: "Demand Planning", Component: DemandPlanning }
+        ] },
+        { value: "finance", label: "Finance", components: [
+            { name: "Finance", Component: Finance },
+            { name: "Costing", Component: Costing },
+            { name: "Treasury Management", Component: TreasuryManagement },
+            { name: "Budget Management", Component: BudgetManagement },
+            { name: "Fixed Assets", Component: FixedAssets },
+            { name: "Asset Lifecycle", Component: AssetLifecycle },
+            { name: "Depreciation Reports", Component: DepreciationReports },
+            { name: "Financial Reports", Component: FinancialReports },
+            { name: "Zakat Management", Component: ZakatManagement }
+        ] },
+        { value: "projects", label: "Projects", components: [{ name: "Projects", Component: Projects }] },
+        { value: "hr", label: "HR", components: [
+            { name: "HR", Component: HR },
+            { name: "HR Reports", Component: HRReports }
+        ] },
+        { value: "compliance", label: "Compliance", components: [
+            { name: "ZATCA", Component: ZATCA },
+            { name: "Compliance Reports", Component: ComplianceReports },
+            { name: "IT Security Reports", Component: ITSecurityReports }
+        ] },
+        { value: "reports", label: "Reports", components: [
+            { name: "Reports", Component: Reports },
+            { name: "Sales Reports", Component: SalesReports },
+            { name: "Financial Reports", Component: FinancialReports },
+            { name: "Inventory Reports", Component: InventoryReports },
+            { name: "Manufacturing Reports", Component: ManufacturingReports },
+            { name: "HR Reports", Component: HRReports },
+            { name: "Compliance Reports", Component: ComplianceReports },
+            { name: "Quality Maintenance Reports", Component: QualityMaintenanceReports },
+            { name: "Depreciation Reports", Component: DepreciationReports }
+        ] },
+        { value: "workflow", label: "Workflow", components: [
+            { name: "Approvals", Component: Approvals },
+            { name: "Approval Workflows", Component: ApprovalWorkflows }
+        ] },
+        { value: "administration", label: "Administration", components: [
+            { name: "Master Data Management", Component: MasterDataManagement },
+            { name: "Admin Center", Component: AdminCenter },
+            { name: "Integrations", Component: Integrations },
+            { name: "Notifications", Component: Notifications }
+        ] }
+    ]), []);
+
+    const activeModule = dashboardTabs.find(tab => tab.value === activeTab) || dashboardTabs[0];
+
+    return (
+        <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+            <div>
+                <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{t('dashboard')}</h1>
+                <p className="text-sm md:text-base text-gray-600 mt-1">
+                    Central access to every HORIZON module, dashboard card, chart, and report.
+                </p>
+            </div>
+
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-5">
+                <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+                    <TabsList className="h-auto min-w-max justify-start bg-transparent p-0">
+                        {dashboardTabs.map(tab => (
+                            <TabsTrigger
+                                key={tab.value}
+                                value={tab.value}
+                                className="px-3 py-2 data-[state=active]:bg-[#24466f] data-[state=active]:text-white"
+                            >
+                                {tab.label}
+                            </TabsTrigger>
+                        ))}
+                    </TabsList>
+                </div>
+
+                <TabsContent value={activeModule.value} className="mt-0">
+                    <ModulePanel components={activeModule.components} />
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }
