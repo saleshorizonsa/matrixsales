@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { matrixSales } from '@/api/matrixSalesClient';
 
+const MATRIXSALES_FULL_ADMIN_EMAILS = ['shareef6695@gmail.com'];
+
 /**
  * Custom hook to check user permissions
  * Usage: const { hasPermission, isAdmin, loading, userRoles } = usePermissions();
@@ -22,7 +24,8 @@ export function usePermissions() {
                     .split(',')
                     .map(email => email.trim().toLowerCase())
                     .filter(Boolean);
-                const isConfiguredAdmin = configuredAdminEmails.includes(user.email?.toLowerCase());
+                const fullAdminEmails = [...MATRIXSALES_FULL_ADMIN_EMAILS, ...configuredAdminEmails];
+                const isConfiguredAdmin = fullAdminEmails.includes(user.email?.toLowerCase());
 
                 if (user.role === 'admin' || isConfiguredAdmin) {
                     setIsBootstrapAdmin(isConfiguredAdmin);
@@ -162,7 +165,7 @@ export async function checkPermission(module, action) {
         const user = await matrixSales.auth.me();
         
         // Admins have all permissions
-        if (user.role === 'admin') return true;
+        if (user.role === 'admin' || MATRIXSALES_FULL_ADMIN_EMAILS.includes(user.email?.toLowerCase())) return true;
 
         // Fetch user's roles
         if (!user.assigned_roles || user.assigned_roles.length === 0) return false;
