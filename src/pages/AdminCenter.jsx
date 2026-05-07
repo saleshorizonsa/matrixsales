@@ -26,8 +26,10 @@ export default function AdminCenter() {
     const [activeTab, setActiveTab] = useState("setup");
     const [showPlantForm, setShowPlantForm] = useState(false);
     const [showStorageLocationForm, setShowStorageLocationForm] = useState(false);
+    const [showUnitConversionForm, setShowUnitConversionForm] = useState(false);
     const [editingPlant, setEditingPlant] = useState(null);
     const [editingStorageLocation, setEditingStorageLocation] = useState(null);
+    const [editingUnitConversion, setEditingUnitConversion] = useState(null);
     const [deleteConfirm, setDeleteConfirm] = useState({ open: false, type: null, item: null });
     
     const { hasPermission, isAdmin, loading } = usePermissions();
@@ -43,6 +45,12 @@ export default function AdminCenter() {
     const { data: storageLocations = [] } = useQuery({
         queryKey: ['storageLocations'],
         queryFn: () => matrixSales.entities.StorageLocation.list(),
+        initialData: []
+    });
+
+    const { data: unitConversions = [] } = useQuery({
+        queryKey: ['unitConversions'],
+        queryFn: () => matrixSales.entities.UnitConversion.list(),
         initialData: []
     });
 
@@ -151,6 +159,11 @@ export default function AdminCenter() {
         setShowStorageLocationForm(true);
     };
 
+    const handleEditUnitConversion = (conversion) => {
+        setEditingUnitConversion(conversion);
+        setShowUnitConversionForm(true);
+    };
+
     const handleClosePlantForm = () => {
         setShowPlantForm(false);
         setEditingPlant(null);
@@ -159,6 +172,11 @@ export default function AdminCenter() {
     const handleCloseStorageLocationForm = () => {
         setShowStorageLocationForm(false);
         setEditingStorageLocation(null);
+    };
+
+    const handleCloseUnitConversionForm = () => {
+        setShowUnitConversionForm(false);
+        setEditingUnitConversion(null);
     };
 
     const handleDeletePlant = (plant) => {
@@ -328,11 +346,35 @@ export default function AdminCenter() {
 
                 <TabsContent value="unit-conversion">
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Unit Conversions</CardTitle>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <CardTitle className="flex items-center gap-2">
+                                <Ruler className="w-5 h-5 text-amber-600" />
+                                Unit Conversions
+                            </CardTitle>
+                            <Button
+                                onClick={() => setShowUnitConversionForm(true)}
+                                size="sm"
+                                className="bg-emerald-600"
+                            >
+                                <Plus className="w-4 h-4 mr-1" />
+                                New Conversion
+                            </Button>
                         </CardHeader>
                         <CardContent>
-                            <UnitConversionForm />
+                            <DataTable
+                                data={unitConversions}
+                                columns={[
+                                    { header: 'Conversion ID', key: 'conversion_id' },
+                                    { header: 'Material', key: 'material_name' },
+                                    { header: 'From Unit', key: 'from_unit' },
+                                    { header: 'To Unit', key: 'to_unit' },
+                                    { header: 'Factor', key: 'conversion_factor' },
+                                    { header: 'Status', key: 'status', isBadge: true }
+                                ]}
+                                onEdit={handleEditUnitConversion}
+                                enableSorting={true}
+                                showSearch={false}
+                            />
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -449,6 +491,14 @@ export default function AdminCenter() {
                     item={editingStorageLocation} 
                     onClose={handleCloseStorageLocationForm}
                     open={showStorageLocationForm}
+                />
+            )}
+
+            {showUnitConversionForm && (
+                <UnitConversionForm
+                    item={editingUnitConversion}
+                    onClose={handleCloseUnitConversionForm}
+                    open={showUnitConversionForm}
                 />
             )}
 
