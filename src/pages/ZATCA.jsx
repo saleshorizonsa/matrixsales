@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { matrixSales } from "@/api/matrixSalesClient";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -11,20 +11,17 @@ import {
     FileText, 
     CheckCircle, 
     AlertTriangle, 
-    XCircle, 
     Settings,
-    Send
+    ShieldCheck
 } from "lucide-react";
 import DataTable from "../components/erp/DataTable";
 import ZATCAConfigForm from "../components/zatca/ZATCAConfigForm";
 import VATReturnDashboard from "../components/zatca/VATReturnDashboard";
-import { useToast } from "@/components/ui/use-toast";
+import ZATCAPhaseReadiness from "../components/zatca/ZATCAPhaseReadiness";
 
 export default function ZATCA() {
-    const [activeTab, setActiveTab] = useState("dashboard");
+    const [activeTab, setActiveTab] = useState("readiness");
     const [showConfigDialog, setShowConfigDialog] = useState(false);
-    const queryClient = useQueryClient();
-    const { toast } = useToast();
 
     const { data: invoices = [] } = useQuery({
         queryKey: ['invoices'],
@@ -54,14 +51,6 @@ export default function ZATCA() {
 
     // KPI Calculations
     const totalInvoices = invoices.length;
-    const submittedInvoices = invoices.filter(i => i.zatca_submitted).length;
-    const clearedInvoices = invoices.filter(i => i.zatca_status === 'cleared').length;
-    const rejectedInvoices = invoices.filter(i => i.zatca_status === 'rejected').length;
-    const pendingInvoices = invoices.filter(i => !i.zatca_submitted && i.invoice_type !== 'draft').length;
-    
-    const clearanceRate = totalInvoices > 0 ? Math.round((clearedInvoices / totalInvoices) * 100) : 0;
-    const submissionRate = totalInvoices > 0 ? Math.round((submittedInvoices / totalInvoices) * 100) : 0;
-
     const recentFailures = submissionLogs.filter(log => !log.success && 
         new Date(log.submission_date) > new Date(Date.now() - 24 * 60 * 60 * 1000)
     ).length;
@@ -110,36 +99,6 @@ export default function ZATCA() {
         { header: "Success", key: "success", render: (val) => val ? "✓" : "✗" }
     ];
 
-    const submitInvoiceMutation = useMutation({
-        mutationFn: async (invoiceId) => {
-            toast({
-                title: "Submitting to ZATCA",
-                description: "Invoice submission in progress...",
-                variant: "default"
-            });
-            
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            return { success: true };
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['invoices'] });
-            queryClient.invalidateQueries({ queryKey: ['submissionLogs'] });
-            toast({
-                title: "Success",
-                description: "Invoice submitted to ZATCA successfully",
-                variant: "default"
-            });
-        },
-        onError: () => {
-            toast({
-                title: "Error",
-                description: "Failed to submit invoice to ZATCA",
-                variant: "destructive"
-            });
-        }
-    });
-
     return (
         <div className="p-6 space-y-6">
             <div className="flex justify-between items-center">
@@ -185,13 +144,21 @@ export default function ZATCA() {
             )}
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <TabsList className="grid grid-cols-5 w-full">
+                <TabsList className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 w-full h-auto">
+                    <TabsTrigger value="readiness">
+                        <ShieldCheck className="w-4 h-4 mr-2" />
+                        Phase 1 & 2
+                    </TabsTrigger>
                     <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
                     <TabsTrigger value="vat_return">VAT Returns</TabsTrigger>
                     <TabsTrigger value="invoices">Invoices</TabsTrigger>
                     <TabsTrigger value="logs">Submission Logs</TabsTrigger>
                     <TabsTrigger value="config">Configuration</TabsTrigger>
                 </TabsList>
+
+                <TabsContent value="readiness">
+                    <ZATCAPhaseReadiness invoices={invoices} activeConfig={activeConfig} />
+                </TabsContent>
 
                 <TabsContent value="dashboard">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
