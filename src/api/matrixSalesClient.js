@@ -86,6 +86,7 @@ const auditableEntityNames = new Set([
   'LeaveRequest',
   'Material',
   'Payment',
+  'PeriodClose',
   'Plant',
   'Product',
   'ProductionOrder',
@@ -107,6 +108,66 @@ const auditableEntityNames = new Set([
   'WorkOrder',
   'ZATCASubmissionLog'
 ]);
+
+const periodControlledEntityConfig = {
+  AccountsPayable: { module: 'finance', dateFields: ['invoice_date', 'posting_date', 'document_date', 'due_date'] },
+  AccountsReceivable: { module: 'finance', dateFields: ['invoice_date', 'posting_date', 'document_date', 'due_date'] },
+  Budget: { module: 'finance', dateFields: ['period_start', 'budget_date', 'posting_date', 'document_date'] },
+  CashFlowForecast: { module: 'finance', dateFields: ['forecast_date', 'period_start', 'document_date'] },
+  FixedAsset: { module: 'finance', dateFields: ['acquisition_date', 'capitalization_date', 'posting_date'] },
+  FinancialTransaction: { module: 'finance', dateFields: ['transaction_date', 'posting_date', 'document_date'] },
+  Invoice: { module: 'sales', dateFields: ['invoice_date', 'posting_date', 'document_date'] },
+  JournalEntry: { module: 'finance', dateFields: ['posting_date', 'document_date', 'entry_date'] },
+  Payment: { module: 'finance', dateFields: ['payment_date', 'posting_date', 'document_date'] },
+  VendorInvoice: { module: 'purchasing', dateFields: ['invoice_date', 'posting_date', 'document_date'] },
+  Delivery: { module: 'sales', dateFields: ['delivery_date', 'posting_date', 'document_date'] },
+  GoodsReceiptNote: { module: 'purchasing', dateFields: ['receipt_date', 'posting_date', 'grn_date', 'document_date'] },
+  PurchaseOrder: { module: 'purchasing', dateFields: ['order_date', 'posting_date', 'document_date'] },
+  PurchaseRequisition: { module: 'purchasing', dateFields: ['request_date', 'requisition_date', 'document_date'] },
+  Quotation: { module: 'sales', dateFields: ['quotation_date', 'document_date'] },
+  RFQ: { module: 'purchasing', dateFields: ['rfq_date', 'document_date'] },
+  SalesOrder: { module: 'sales', dateFields: ['order_date', 'posting_date', 'document_date'] },
+  SalesReturn: { module: 'sales', dateFields: ['return_date', 'posting_date', 'document_date'] },
+  StockMovement: { module: 'inventory', dateFields: ['movement_date', 'posting_date', 'document_date'] },
+  StockTransferOrder: { module: 'inventory', dateFields: ['transfer_date', 'posting_date', 'document_date'] },
+  CycleCount: { module: 'inventory', dateFields: ['count_date', 'posting_date', 'document_date'] },
+  ProductionOrder: { module: 'operations', dateFields: ['planned_start_date', 'start_date', 'posting_date', 'document_date'] },
+  WorkOrder: { module: 'operations', dateFields: ['scheduled_date', 'completion_date', 'posting_date', 'document_date'] },
+  Payroll: { module: 'hr', dateFields: ['payroll_date', 'period_start', 'posting_date', 'document_date'] },
+  GOSIContribution: { module: 'hr', dateFields: ['contribution_date', 'period_start', 'posting_date'] },
+  LeaveRequest: { module: 'hr', dateFields: ['start_date', 'request_date', 'document_date'] },
+  LoanAdvance: { module: 'hr', dateFields: ['request_date', 'posting_date', 'document_date'] },
+  ProjectExpense: { module: 'projects', dateFields: ['expense_date', 'posting_date', 'document_date'] },
+  ProjectInvoice: { module: 'projects', dateFields: ['invoice_date', 'posting_date', 'document_date'] },
+  Timesheet: { module: 'projects', dateFields: ['timesheet_date', 'week_start', 'posting_date'] },
+  VATReturn: { module: 'compliance', dateFields: ['period_start', 'filing_date', 'document_date'] },
+  ZATCASubmissionLog: { module: 'compliance', dateFields: ['submission_date', 'invoice_date', 'document_date'] },
+  ZakatComputation: { module: 'compliance', dateFields: ['period_start', 'computation_date'] }
+};
+
+const lockedRecordStatusValues = new Set([
+  'posted',
+  'closed',
+  'cleared',
+  'reported',
+  'paid',
+  'completed',
+  'pgi_completed',
+  'reversed',
+  'cancelled',
+  'submitted_to_zatca',
+  'locked'
+]);
+
+const lockedStatusFields = [
+  'status',
+  'posting_status',
+  'payment_status',
+  'zatca_status',
+  'filing_status',
+  'submission_status',
+  'period_status'
+];
 
 const documentNumberConfig = {
   Quotation: { type: 'quotation', fields: ['quotation_number'] },
@@ -183,6 +244,114 @@ const getDocumentNumberFromRecord = (entityName, record = {}) => {
 
   const field = [...configuredFields, ...fallbackFields].find((key) => record?.[key]);
   return field ? record[field] : record?.id;
+};
+
+const normalizeDateOnly = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
+};
+
+const getPeriodKey = (value) => {
+  const date = normalizeDateOnly(value);
+  return date ? date.slice(0, 7) : null;
+};
+
+const getPeriodPostingDate = (entityName, record = {}) => {
+  const config = periodControlledEntityConfig[entityName];
+  if (!config) return null;
+  const field = config.dateFields.find((key) => record?.[key]);
+  return field ? normalizeDateOnly(record[field]) : null;
+};
+
+const isRecordStatusLocked = (record = {}) =>
+  lockedStatusFields.some((field) => {
+    const value = String(record?.[field] || '').toLowerCase();
+    return lockedRecordStatusValues.has(value);
+  });
+
+const getLockedStatusLabel = (record = {}) => {
+  const field = lockedStatusFields.find((key) =>
+    lockedRecordStatusValues.has(String(record?.[key] || '').toLowerCase())
+  );
+  return field ? `${field}: ${record[field]}` : 'locked status';
+};
+
+const isDateInPeriod = (postingDate, period = {}) => {
+  const date = normalizeDateOnly(postingDate);
+  const start = normalizeDateOnly(period.period_start);
+  const end = normalizeDateOnly(period.period_end);
+  if (!date || !start || !end) return false;
+  return date >= start && date <= end;
+};
+
+const findClosedSupabasePeriod = async ({ client, entityName, record = {}, organizationId = null }) => {
+  const config = periodControlledEntityConfig[entityName];
+  if (!config) return null;
+
+  const postingDate = getPeriodPostingDate(entityName, record);
+  if (!postingDate) return null;
+
+  try {
+    let query = client
+      .from('period_close')
+      .select('*')
+      .eq('record->>status', 'closed');
+
+    if (organizationId) {
+      query = query.or(`organization_id.eq.${organizationId},organization_id.is.null`);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      if (error.code === '42P01' || /period_close/i.test(error.message || '')) {
+        console.warn('Period close table is not available yet; skipping closed-period check.');
+        return null;
+      }
+      throw error;
+    }
+
+    const periodKey = getPeriodKey(postingDate);
+    return normalizeList(data)
+      .map(normalizeRow)
+      .find((period) => {
+        const moduleMatches = !period.module || period.module === 'all' || period.module === config.module;
+        const keyMatches = !period.period_key || period.period_key === periodKey;
+        return moduleMatches && keyMatches && isDateInPeriod(postingDate, period);
+      }) || null;
+  } catch (error) {
+    console.warn('Period close check skipped:', error);
+    return null;
+  }
+};
+
+const assertSupabaseRecordCanMutate = async ({
+  client,
+  entityName,
+  action,
+  existingRecord = null,
+  nextRecord = null,
+  organizationId = null
+}) => {
+  if (entityName === 'PeriodClose') return;
+
+  if ((action === 'update' || action === 'delete') && existingRecord && isRecordStatusLocked(existingRecord)) {
+    throw new Error(`This ${tableNameForEntity(entityName).replace(/_/g, ' ')} has ${getLockedStatusLabel(existingRecord)} and cannot be changed. Reverse or reopen it through the approved process.`);
+  }
+
+  const checkRecord = nextRecord || existingRecord;
+  const closedPeriod = await findClosedSupabasePeriod({
+    client,
+    entityName,
+    record: checkRecord,
+    organizationId
+  });
+
+  if (closedPeriod) {
+    const postingDate = getPeriodPostingDate(entityName, checkRecord);
+    throw new Error(`Posting date ${postingDate} is inside closed period ${closedPeriod.period_key || closedPeriod.period_name || closedPeriod.id}. Reopen the period in Admin Center before changing this record.`);
+  }
 };
 
 const shouldAutoNumberRecord = (entityName, record = {}) => {
@@ -482,6 +651,14 @@ const createSupabaseEntity = (entityName) => {
         }
       }
 
+      await assertSupabaseRecordCanMutate({
+        client,
+        entityName,
+        action: 'create',
+        nextRecord: record,
+        organizationId
+      });
+
       const payload = {
         base44_id: record.base44_id || record.base44Id || null,
         organization_id: organizationId,
@@ -513,9 +690,19 @@ const createSupabaseEntity = (entityName) => {
     bulkCreate: async (records = []) => {
       const client = requireSupabase();
       const selectedOrganizationId = getSelectedOrganizationId();
-      const payload = records.map((record) => {
+      const payload = [];
+
+      for (const record of records) {
         const organizationId = record.organization_id || (isOrganizationScoped ? selectedOrganizationId : null);
-        return {
+        await assertSupabaseRecordCanMutate({
+          client,
+          entityName,
+          action: 'create',
+          nextRecord: record,
+          organizationId
+        });
+
+        payload.push({
           base44_id: record.base44_id || record.base44Id || null,
           organization_id: organizationId,
           organization_key: record.organization_key || null,
@@ -523,8 +710,8 @@ const createSupabaseEntity = (entityName) => {
             ...record,
             ...(organizationId ? { organization_id: organizationId } : {})
           }
-        };
-      });
+        });
+      }
 
       const { data, error } = await client
         .from(tableName)
@@ -553,6 +740,15 @@ const createSupabaseEntity = (entityName) => {
           : {})
       };
       const organizationId = data?.organization_id || existing?.organization_id || (isOrganizationScoped ? selectedOrganizationId : null);
+
+      await assertSupabaseRecordCanMutate({
+        client,
+        entityName,
+        action: 'update',
+        existingRecord: normalizeRow(existing),
+        nextRecord: record,
+        organizationId
+      });
 
       const { data: row, error } = await client
         .from(tableName)
@@ -591,6 +787,13 @@ const createSupabaseEntity = (entityName) => {
       } catch {
         existing = null;
       }
+      await assertSupabaseRecordCanMutate({
+        client,
+        entityName,
+        action: 'delete',
+        existingRecord: existing ? normalizeRow(existing) : null,
+        organizationId: existing?.organization_id || null
+      });
       const { error } = await client.from(tableName).delete().eq('id', id);
       if (error) throw error;
       if (entityName === 'Organization') notifyOrganizationsChanged();
