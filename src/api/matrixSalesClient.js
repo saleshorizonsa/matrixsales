@@ -460,6 +460,48 @@ const notifyOrganizationsChanged = () => {
   window.dispatchEvent(new CustomEvent('matrixsales:organizations-changed'));
 };
 
+const normalizeTenantUserRecord = (row) => {
+  if (!row) return null;
+  return {
+    id: row.id,
+    ...(row.record || {}),
+    tenant_id: row.tenant_id ?? row.organization_id ?? row.record?.tenant_id,
+    organization_id: row.organization_id ?? row.tenant_id ?? row.record?.organization_id
+  };
+};
+
+const getTenantUserProfileForAuthUser = async (client, authUser) => {
+  if (!authUser?.email) return null;
+
+  try {
+    const selectedOrganizationId = getSelectedOrganizationId();
+    let query = client
+      .from('user')
+      .select('*')
+      .eq('record->>email', authUser.email);
+
+    if (selectedOrganizationId) {
+      query = query.or(`organization_id.eq.${selectedOrganizationId},tenant_id.eq.${selectedOrganizationId}`);
+    }
+
+    const { data, error } = await query.limit(1);
+    if (error) throw error;
+    if (data?.[0]) return normalizeTenantUserRecord(data[0]);
+
+    const fallback = await client
+      .from('user')
+      .select('*')
+      .eq('record->>email', authUser.email)
+      .limit(1);
+
+    if (fallback.error) throw fallback.error;
+    return normalizeTenantUserRecord(fallback.data?.[0]);
+  } catch (error) {
+    console.warn('Unable to load tenant user profile:', error.message || error);
+    return null;
+  }
+};
+
 const normalizeRow = (row) => ({
   ...(row?.record || {}),
   id: row?.id,
@@ -524,16 +566,30 @@ const getCurrentSupabaseUser = async () => {
   if (error) throw error;
   if (!data.user) throw new Error('Authentication required');
 
+  const tenantUser = await getTenantUserProfileForAuthUser(client, data.user);
+  const assignedRoles = tenantUser?.assigned_roles || [];
+  const tenantRole = tenantUser?.role;
+  const isTenantAdmin =
+    tenantRole === 'admin' ||
+    tenantRole === 'owner' ||
+    assignedRoles.includes('TENANT_ADMIN');
+  const configuredRole = isMatrixSalesAdminEmail(
+    data.user.email,
+    import.meta.env.VITE_MATRIXSALES_ADMIN_EMAILS || ''
+  ) ? (isMatrixSalesPlatformOwner(data.user.email) ? 'owner' : 'admin') : null;
+  const effectiveRole = configuredRole || (isTenantAdmin ? 'admin' : tenantRole || 'user');
+
   return {
     id: data.user.id,
     email: data.user.email,
     full_name: data.user.user_metadata?.full_name || data.user.email,
-    role: isMatrixSalesAdminEmail(
-      data.user.email,
-      import.meta.env.VITE_MATRIXSALES_ADMIN_EMAILS || ''
-    ) ? (isMatrixSalesPlatformOwner(data.user.email) ? 'owner' : 'admin') : 'user',
+    role: effectiveRole,
+    tenant_role: tenantRole || null,
+    tenant_user_id: tenantUser?.id || null,
+    tenant_id: tenantUser?.tenant_id || null,
+    organization_id: tenantUser?.organization_id || null,
     is_platform_owner: isMatrixSalesPlatformOwner(data.user.email),
-    assigned_roles: []
+    assigned_roles: assignedRoles
   };
 };
 
