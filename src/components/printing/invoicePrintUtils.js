@@ -133,6 +133,20 @@ export const normalizeInvoiceForPrint = (invoice = {}, organization = {}, prefer
   const vatAmount = Number(invoice.tax_amount ?? invoice.vat_amount ?? taxableAmount * (vatRate / 100));
   const totalAmount = Number(invoice.total_amount ?? taxableAmount + vatAmount);
   const currency = invoice.currency || "SAR";
+  const serviceItems = Array.isArray(invoice.service_lines)
+    ? invoice.service_lines.map((line) => ({
+      name: line.service_description || line.description || "IT Services",
+      description: invoice.contract_number ? `Contract ${invoice.contract_number}` : line.description || "",
+      quantity: Number(line.quantity || 1),
+      unit: line.unit || line.unit_of_measure || invoice.unit_of_measure || "month",
+      unit_price: Number(line.unit_price || 0),
+      discount: Number(line.discount_amount || line.discount || 0),
+      taxable_amount: Number(line.taxable_amount || 0),
+      vat_rate: Number(line.vat_rate ?? invoice.tax_percent ?? 15),
+      vat_amount: Number(line.vat_amount || 0),
+      total_amount: Number(line.line_total ?? line.total_amount ?? 0)
+    }))
+    : null;
 
   return {
     invoice_number: invoice.invoice_number || invoice.document_number || invoice.id || "DRAFT",
@@ -150,12 +164,12 @@ export const normalizeInvoiceForPrint = (invoice = {}, organization = {}, prefer
       vat_number: invoice.customer_vat_number || invoice.buyer_vat_number || "",
       address: invoice.billing_address || invoice.customer_address || invoice.delivery_address || ""
     },
-    items: invoice.items || [
+    items: invoice.items || serviceItems || [
       {
-        name: invoice.product_name || invoice.product_code || "Item",
-        description: invoice.product_code || "",
+        name: invoice.service_description || invoice.product_name || invoice.product_code || "Item",
+        description: invoice.invoice_mode === "service" ? (invoice.contract_number || invoice.product_code || "") : (invoice.product_code || ""),
         quantity,
-        unit: invoice.unit || invoice.uom || "EA",
+        unit: invoice.unit || invoice.uom || invoice.unit_of_measure || "EA",
         unit_price: unitPrice,
         discount,
         taxable_amount: taxableAmount,
@@ -223,4 +237,3 @@ export const createSecureShareToken = () => {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
   return `share-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 };
-

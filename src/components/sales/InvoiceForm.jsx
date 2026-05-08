@@ -21,6 +21,9 @@ export default function InvoiceForm({ item, onClose }) {
     const { toast } = useToast();
     const [activeTab, setActiveTab] = useState("details");
     const [showPrintPreview, setShowPrintPreview] = useState(false);
+    const today = new Date().toISOString().split('T')[0];
+    const defaultDueDate = new Date();
+    defaultDueDate.setDate(defaultDueDate.getDate() + 30);
     
     const { data: salesOrders = [] } = useQuery({
         queryKey: ['sales'],
@@ -52,19 +55,27 @@ export default function InvoiceForm({ item, onClose }) {
 
     const [formData, setFormData] = useState({
         invoice_number: '',
+        invoice_mode: 'service',
+        invoice_category: 'service',
+        invoice_type: 'standard_tax_invoice',
         sales_order_number: '',
         delivery_number: '',
         customer_name: '',
         customer_email: '',
+        customer_vat_number: '',
         billing_address: '',
-        invoice_date: new Date().toISOString().split('T')[0],
-        due_date: '',
+        invoice_date: today,
+        due_date: defaultDueDate.toISOString().split('T')[0],
+        service_period_start: today,
+        service_period_end: defaultDueDate.toISOString().split('T')[0],
         product_code: '',
         product_name: '',
-        quantity: 0,
+        service_description: '',
+        unit_of_measure: 'month',
+        quantity: 1,
         unit_price: 0,
         subtotal: 0,
-        tax_percent: 0,
+        tax_percent: 15,
         tax_amount: 0,
         total_amount: 0,
         payment_terms: 'net_30',
@@ -79,9 +90,12 @@ export default function InvoiceForm({ item, onClose }) {
             // Ensure numbers are parsed if they come as strings
             setFormData({
                 ...item,
+                invoice_mode: item.invoice_mode || (item.invoice_category === 'service' ? 'service' : 'sales_order'),
+                invoice_category: item.invoice_category || item.invoice_mode || 'sales_order',
+                invoice_type: item.invoice_type || 'standard_tax_invoice',
                 quantity: parseFloat(item.quantity) || 0,
                 unit_price: parseFloat(item.unit_price) || 0,
-                tax_percent: parseFloat(item.tax_percent) || 0,
+                tax_percent: parseFloat(item.tax_percent) || 15,
                 amount_paid: parseFloat(item.amount_paid) || 0,
             });
         }
@@ -118,6 +132,8 @@ export default function InvoiceForm({ item, onClose }) {
 
             setFormData(prev => ({
                 ...prev,
+                invoice_mode: 'sales_order',
+                invoice_category: 'sales_order',
                 sales_order_number: orderNumber,
                 delivery_number: matchingDelivery?.delivery_number || '',
                 customer_name: selectedOrder.customer_name,
@@ -161,7 +177,25 @@ export default function InvoiceForm({ item, onClose }) {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        saveMutation.mutate(formData);
+        const isService = formData.invoice_mode === 'service';
+        const payload = {
+            ...formData,
+            invoice_category: isService ? 'service' : 'sales_order',
+            product_code: isService ? (formData.product_code || 'SERVICE') : formData.product_code,
+            product_name: isService ? (formData.product_name || formData.service_description || 'IT Services') : formData.product_name,
+            service_description: isService ? (formData.service_description || formData.product_name || 'IT Services') : formData.service_description
+        };
+
+        if (isService && (!payload.customer_name || !payload.service_description || !payload.due_date)) {
+            toast({
+                title: "Missing invoice data",
+                description: "Customer, service description, and due date are required for service invoices.",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        saveMutation.mutate(payload);
     };
 
     const handleChange = (field, value) => {
@@ -172,6 +206,7 @@ export default function InvoiceForm({ item, onClose }) {
     const deliveredOrders = salesOrders.filter(o => 
         deliveries.some(d => d.sales_order_number === o.order_number && d.status === 'pgi_completed')
     );
+    const isServiceInvoiceMode = formData.invoice_mode === 'service';
 
     return (
         <Dialog open={true} onOpenChange={onClose}>
@@ -201,8 +236,56 @@ export default function InvoiceForm({ item, onClose }) {
 
                     <TabsContent value="details">
                         <form onSubmit={handleSubmit} className="space-y-6">
+                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                                <div className="grid gap-4 md:grid-cols-3">
+                                    <div>
+                                        <Label>Invoice Mode</Label>
+                                        <Select
+                                            value={formData.invoice_mode}
+                                            onValueChange={(value) => {
+                                                handleChange('invoice_mode', value);
+                                                handleChange('invoice_category', value === 'service' ? 'service' : 'sales_order');
+                                                if (value === 'service') {
+                                                    handleChange('sales_order_number', '');
+                                                    handleChange('delivery_number', '');
+                                                    handleChange('quantity', formData.quantity || 1);
+                                                    handleChange('tax_percent', formData.tax_percent || 15);
+                                                }
+                                            }}
+                                            disabled={!!item}
+                                        >
+                                            <SelectTrigger className="bg-white">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="service">Service Invoice</SelectItem>
+                                                <SelectItem value="sales_order">Sales Order Invoice</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div>
+                                        <Label>Invoice Type</Label>
+                                        <Select value={formData.invoice_type} onValueChange={(value) => handleChange('invoice_type', value)}>
+                                            <SelectTrigger className="bg-white">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="standard_tax_invoice">Standard Tax Invoice (B2B)</SelectItem>
+                                                <SelectItem value="simplified_tax_invoice">Simplified Tax Invoice (B2C)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div>
+                                        <Label>Inventory Validation</Label>
+                                        <div className="mt-2 rounded-md bg-white px-3 py-2 text-sm text-slate-600 border">
+                                            {isServiceInvoiceMode ? 'Disabled for service-only invoices' : 'Requires delivered sales order'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* Sales Order Reference Section */}
-                            {!item && (
+                            {!item && !isServiceInvoiceMode && (
                                 <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
                                     <Label className="text-indigo-900 font-semibold mb-2 block">
                                         Select Sales Order *
@@ -210,7 +293,7 @@ export default function InvoiceForm({ item, onClose }) {
                                     <Select 
                                         value={formData.sales_order_number} 
                                         onValueChange={handleSalesOrderSelect}
-                                        required
+                                        required={!isServiceInvoiceMode}
                                     >
                                         <SelectTrigger className="bg-white">
                                             <SelectValue placeholder="Select a sales order with completed PGI..." />
@@ -240,11 +323,11 @@ export default function InvoiceForm({ item, onClose }) {
                                 <h3 className="font-semibold text-lg border-b pb-2">Invoice Information</h3>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <Label>Invoice Number *</Label>
+                                        <Label>Invoice Number</Label>
                                         <Input
                                             value={formData.invoice_number}
                                             onChange={(e) => handleChange('invoice_number', e.target.value)}
-                                            required
+                                            placeholder="Auto if blank"
                                         />
                                     </div>
                                     <div>
@@ -277,6 +360,26 @@ export default function InvoiceForm({ item, onClose }) {
                                         />
                                     </div>
                                 </div>
+                                {isServiceInvoiceMode && (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <Label>Service Period Start</Label>
+                                            <Input
+                                                type="date"
+                                                value={formData.service_period_start || ''}
+                                                onChange={(e) => handleChange('service_period_start', e.target.value)}
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Service Period End</Label>
+                                            <Input
+                                                type="date"
+                                                value={formData.service_period_end || ''}
+                                                onChange={(e) => handleChange('service_period_end', e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Customer Information */}
@@ -300,6 +403,13 @@ export default function InvoiceForm({ item, onClose }) {
                                             onChange={(e) => handleChange('customer_email', e.target.value)}
                                         />
                                     </div>
+                                    <div>
+                                        <Label>Customer VAT Number</Label>
+                                        <Input
+                                            value={formData.customer_vat_number || ''}
+                                            onChange={(e) => handleChange('customer_vat_number', e.target.value)}
+                                        />
+                                    </div>
                                 </div>
 
                                 <div>
@@ -315,29 +425,46 @@ export default function InvoiceForm({ item, onClose }) {
 
                             {/* Product & Pricing */}
                             <div className="space-y-4">
-                                <h3 className="font-semibold text-lg border-b pb-2">Items & Pricing</h3>
+                                <h3 className="font-semibold text-lg border-b pb-2">{isServiceInvoiceMode ? 'Services & Pricing' : 'Items & Pricing'}</h3>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <Label>Product Code *</Label>
+                                        <Label>{isServiceInvoiceMode ? 'Service Code' : 'Product Code *'}</Label>
                                         <Input
                                             value={formData.product_code}
                                             onChange={(e) => handleChange('product_code', e.target.value)}
-                                            required
+                                            required={!isServiceInvoiceMode}
                                             disabled={!!formData.sales_order_number}
+                                            placeholder={isServiceInvoiceMode ? 'SERVICE' : ''}
                                         />
                                     </div>
                                     <div>
-                                        <Label>Product Name *</Label>
+                                        <Label>{isServiceInvoiceMode ? 'Service Name *' : 'Product Name *'}</Label>
                                         <Input
                                             value={formData.product_name}
-                                            onChange={(e) => handleChange('product_name', e.target.value)}
+                                            onChange={(e) => {
+                                                handleChange('product_name', e.target.value);
+                                                if (isServiceInvoiceMode) handleChange('service_description', e.target.value);
+                                            }}
                                             required
                                             disabled={!!formData.sales_order_number}
                                         />
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-4">
+                                {isServiceInvoiceMode && (
+                                    <div>
+                                        <Label>Service Description *</Label>
+                                        <Textarea
+                                            value={formData.service_description || ''}
+                                            onChange={(e) => handleChange('service_description', e.target.value)}
+                                            rows={3}
+                                            placeholder="Monthly IT support services, cloud administration, AMC/SLA, consulting hours..."
+                                            required
+                                        />
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-4 gap-4">
                                     <div>
                                         <Label>Quantity *</Label>
                                         <Input
@@ -345,6 +472,14 @@ export default function InvoiceForm({ item, onClose }) {
                                             value={formData.quantity}
                                             onChange={(e) => handleChange('quantity', parseFloat(e.target.value) || 0)}
                                             required
+                                            disabled={!!formData.sales_order_number}
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label>Unit</Label>
+                                        <Input
+                                            value={formData.unit_of_measure || ''}
+                                            onChange={(e) => handleChange('unit_of_measure', e.target.value)}
                                             disabled={!!formData.sales_order_number}
                                         />
                                     </div>
