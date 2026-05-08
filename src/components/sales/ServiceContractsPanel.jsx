@@ -4,22 +4,42 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import DataTable from "@/components/erp/DataTable";
 import ServiceContractForm from "@/components/sales/ServiceContractForm";
+import InvoicePrintPreview from "@/components/printing/InvoicePrintPreview";
 import { matrixSales } from "@/api/matrixSalesClient";
 import { useToast } from "@/components/ui/use-toast";
+import { getTenantLogoAsset, getTenantPrintingPreferences } from "@/components/printing/invoicePrintService";
 import { calculateServiceBusinessKpis, generateRecurringInvoices, isMissingRecurringBillingRunTableError } from "@/lib/serviceBilling";
 import { createNotification } from "@/components/utils/notificationService";
-import { CalendarClock, FilePlus2, Plus, RefreshCw } from "lucide-react";
+import { CalendarClock, FilePlus2, Plus, Printer, RefreshCw } from "lucide-react";
 
 export default function ServiceContractsPanel({ invoices = [] }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [editingContract, setEditingContract] = useState(null);
+  const [generatedInvoices, setGeneratedInvoices] = useState([]);
+  const [printInvoice, setPrintInvoice] = useState(null);
 
   const { data: contracts = [] } = useQuery({
     queryKey: ["serviceContracts"],
     queryFn: () => matrixSales.entities.ServiceContract.list("-next_billing_date"),
     initialData: []
+  });
+
+  const { data: organizations = [] } = useQuery({
+    queryKey: ["organizations"],
+    queryFn: () => matrixSales.entities.Organization.list(),
+    initialData: []
+  });
+
+  const { data: printingPreference } = useQuery({
+    queryKey: ["tenantPrintingPreferences"],
+    queryFn: getTenantPrintingPreferences
+  });
+
+  const { data: logoAsset } = useQuery({
+    queryKey: ["tenantLogoAsset"],
+    queryFn: getTenantLogoAsset
   });
 
   const kpis = calculateServiceBusinessKpis(contracts, invoices);
@@ -49,6 +69,7 @@ export default function ServiceContractsPanel({ invoices = [] }) {
       return generated;
     },
     onSuccess: (generated) => {
+      setGeneratedInvoices(generated);
       queryClient.invalidateQueries({ queryKey: ["serviceContracts"] });
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       toast({
@@ -81,6 +102,42 @@ export default function ServiceContractsPanel({ invoices = [] }) {
         <Card><CardContent className="p-4"><p className="text-sm text-slate-500">Renewals 30d</p><p className="text-xl font-bold">{kpis.upcomingRenewals}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-sm text-slate-500">Overdue Invoices</p><p className="text-xl font-bold">{kpis.overdueInvoices}</p></CardContent></Card>
       </div>
+
+      {generatedInvoices.length > 0 && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-semibold text-emerald-950">Generated invoices ready to print</p>
+              <p className="text-sm text-emerald-800">Open the ZATCA print preview, download PDF, email, or share by WhatsApp.</p>
+            </div>
+            {generatedInvoices.length === 1 && (
+              <Button
+                className="bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => setPrintInvoice(generatedInvoices[0])}
+              >
+                <Printer className="mr-2 h-4 w-4" />
+                Print Preview
+              </Button>
+            )}
+          </div>
+          {generatedInvoices.length > 1 && (
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              {generatedInvoices.map((invoice) => (
+                <div key={invoice.id || invoice.invoice_number} className="flex items-center justify-between gap-3 rounded-md border bg-white px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{invoice.invoice_number || "Generated invoice"}</p>
+                    <p className="truncate text-xs text-slate-500">{invoice.customer_name} · SAR {Number(invoice.total_amount || 0).toLocaleString()}</p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => setPrintInvoice(invoice)}>
+                    <Printer className="mr-2 h-4 w-4" />
+                    Print
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -131,6 +188,16 @@ export default function ServiceContractsPanel({ invoices = [] }) {
             setShowForm(false);
             setEditingContract(null);
           }}
+        />
+      )}
+
+      {printInvoice && (
+        <InvoicePrintPreview
+          invoice={printInvoice}
+          organization={organizations[0] || {}}
+          preferences={printingPreference}
+          logoAsset={logoAsset}
+          onClose={() => setPrintInvoice(null)}
         />
       )}
     </div>
