@@ -582,6 +582,7 @@ const getCurrentSupabaseUser = async () => {
   return {
     id: data.user.id,
     email: data.user.email,
+    email_verified: Boolean(data.user.email_confirmed_at || data.user.confirmed_at),
     full_name: data.user.user_metadata?.full_name || data.user.email,
     role: effectiveRole,
     tenant_role: tenantRole || null,
@@ -736,6 +737,9 @@ const createSupabaseEntity = (entityName) => {
     const selectedOrganizationId = getSelectedOrganizationId();
     const selectedTenantId = getSelectedTenantId();
     const currentUser = await getCurrentSupabaseUserSafe();
+    if (currentUser?.id && !currentUser.email_verified && entityName !== 'SubscriptionPlan') {
+      throw new Error('Email verification is required before accessing tenant data.');
+    }
     const isPlatformOwner = currentUser?.is_platform_owner || currentUser?.role === 'owner';
     const hasOrganizationFilter = Object.prototype.hasOwnProperty.call(filters || {}, 'organization_id');
     const hasTenantFilter = Object.prototype.hasOwnProperty.call(filters || {}, 'tenant_id');
@@ -790,6 +794,9 @@ const createSupabaseEntity = (entityName) => {
     create: async (data = {}) => {
       const client = requireSupabase();
       const currentUser = await getCurrentSupabaseUserSafe();
+      if (currentUser?.id && !currentUser.email_verified && entityName !== 'SubscriptionPlan') {
+        throw new Error('Email verification is required before creating tenant data.');
+      }
       const selectedOrganizationId = getSelectedOrganizationId();
       const organizationId = data.organization_id || (isOrganizationScoped ? selectedOrganizationId : null);
       if (isOrganizationScoped && !organizationId) {
@@ -855,6 +862,10 @@ const createSupabaseEntity = (entityName) => {
     },
     bulkCreate: async (records = []) => {
       const client = requireSupabase();
+      const currentSessionUser = await getCurrentSupabaseUserSafe();
+      if (currentSessionUser?.id && !currentSessionUser.email_verified && entityName !== 'SubscriptionPlan') {
+        throw new Error('Email verification is required before creating tenant data.');
+      }
       const selectedOrganizationId = getSelectedOrganizationId();
       const payload = [];
 
@@ -901,6 +912,10 @@ const createSupabaseEntity = (entityName) => {
     },
     update: async (id, data = {}) => {
       const client = requireSupabase();
+      const currentUser = await getCurrentSupabaseUserSafe();
+      if (currentUser?.id && !currentUser.email_verified && entityName !== 'SubscriptionPlan') {
+        throw new Error('Email verification is required before updating tenant data.');
+      }
       const selectedOrganizationId = getSelectedOrganizationId();
       const { data: existing, error: readError } = await client
         .from(tableName)
@@ -962,6 +977,10 @@ const createSupabaseEntity = (entityName) => {
     },
     delete: async (id) => {
       const client = requireSupabase();
+      const currentUser = await getCurrentSupabaseUserSafe();
+      if (currentUser?.id && !currentUser.email_verified && entityName !== 'SubscriptionPlan') {
+        throw new Error('Email verification is required before deleting tenant data.');
+      }
       let existing = null;
       try {
         const { data } = await client
