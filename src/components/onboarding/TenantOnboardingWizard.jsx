@@ -14,13 +14,6 @@ import { useAuth } from "@/lib/AuthContext";
 import BrandLogo from "@/components/BrandLogo";
 import { getStoredSignupPlan, getSubscriptionPlan, normalizeSubscriptionPlan } from "@/lib/subscriptionPlans";
 import { onboardingStatuses } from "@/lib/emailVerificationGate";
-import {
-    businessTypes,
-    getBusinessTypeLabel,
-    getDefaultModulesForBusinessType,
-    getEnabledModuleKeys,
-    moduleCatalog
-} from "@/lib/tenantModules";
 
 const steps = [
     { key: "email", label: "Email Verification", icon: CheckCircle2 },
@@ -60,7 +53,19 @@ const roleTemplates = [
     { role_code: "HR_MGR", role_name: "HR Manager", description: "Employees, payroll, loans, and HR reports" }
 ];
 
-const moduleDefaults = getDefaultModulesForBusinessType("it_services");
+const moduleDefaults = [
+    "sales",
+    "finance",
+    "inventory",
+    "purchasing",
+    "operations",
+    "hr",
+    "projects",
+    "zatca",
+    "reports",
+    "approvals",
+    "admin"
+];
 
 const emptyCompanyForm = {
     company_legal_name: "",
@@ -75,7 +80,6 @@ const emptyCompanyForm = {
     contact_email: "",
     contact_phone: "",
     business_activity: "",
-    business_type: "it_services",
     preferred_language: "en",
     currency: "SAR",
     fiscal_year_start_month: "1"
@@ -135,8 +139,6 @@ const ensureTenantUser = async (user, organization) => {
 const seedTenantDefaults = async (organization, user) => {
     localStorage.setItem("selected_organization_id", organization.id);
     const currentYear = new Date().getFullYear().toString().slice(-2);
-    const tenantModules = getDefaultModulesForBusinessType(organization.business_type || "it_services");
-    const enabledModuleKeys = getEnabledModuleKeys(tenantModules);
 
     await ensureTenantUser(user, organization);
 
@@ -171,11 +173,9 @@ const seedTenantDefaults = async (organization, user) => {
 
     await upsertByField("IntegrationConfig", "config_id", `modules-${organization.id}`, {
         config_id: `modules-${organization.id}`,
-        integration_name: "tenant_modules",
-        business_type: organization.business_type || "it_services",
-        enabled_modules: enabledModuleKeys,
-        tenant_modules: tenantModules,
-        dashboard_tabs: enabledModuleKeys,
+        integration_name: "standard_modules",
+        enabled_modules: moduleDefaults,
+        dashboard_tabs: moduleDefaults,
         status: "active",
         tenant_id: organization.id,
         organization_id: organization.id
@@ -332,7 +332,6 @@ function CompanyStep({ user, organization, onSaved }) {
 
         try {
             setIsSaving(true);
-            const tenantModules = getDefaultModulesForBusinessType(formData.business_type);
             const payload = {
                 ...formData,
                 organization_name: formData.organization_name || formData.company_legal_name,
@@ -346,9 +345,6 @@ function CompanyStep({ user, organization, onSaved }) {
                 email_verified: true,
                 status: "active",
                 selected_plan: getStoredSignupPlan(),
-                product_positioning: "zatca_recurring_billing_for_saudi_it_services",
-                tenant_modules: tenantModules,
-                enabled_modules: getEnabledModuleKeys(tenantModules),
                 onboarding_status: onboardingStatuses.ZATCA
             };
             const saved = organization
@@ -358,8 +354,6 @@ function CompanyStep({ user, organization, onSaved }) {
                 ...saved,
                 tenant_id: saved.id,
                 organization_id: saved.id,
-                tenant_modules: tenantModules,
-                enabled_modules: getEnabledModuleKeys(tenantModules),
                 onboarding_status: onboardingStatuses.ZATCA
             });
             localStorage.setItem("selected_organization_id", tenantReady.id);
@@ -397,28 +391,6 @@ function CompanyStep({ user, organization, onSaved }) {
                         <div className="space-y-2">
                             <Label>Business Activity *</Label>
                             <Input value={formData.business_activity} onChange={(e) => update("business_activity", e.target.value)} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Business Type *</Label>
-                            <Select
-                                value={formData.business_type || "it_services"}
-                                onValueChange={(value) => {
-                                    update("business_type", value);
-                                    if (!formData.business_activity) {
-                                        update("business_activity", getBusinessTypeLabel(value));
-                                    }
-                                }}
-                            >
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    {businessTypes.map((type) => (
-                                        <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <p className="text-xs text-slate-500">
-                                IT Services focuses the workspace on contracts, recurring invoices, ZATCA, WhatsApp, and support workflows.
-                            </p>
                         </div>
                         <div className="space-y-2">
                             <Label>Country *</Label>
@@ -607,8 +579,6 @@ function ZatcaStep({ organization, existingConfig, onSaved }) {
 function ModulesStep({ user, organization, onSaved }) {
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
-    const tenantModules = getDefaultModulesForBusinessType(organization?.business_type || "it_services");
-    const enabledModuleKeys = getEnabledModuleKeys(tenantModules);
 
     const finish = async () => {
         try {
@@ -618,8 +588,7 @@ function ModulesStep({ user, organization, onSaved }) {
                 ...organization,
                 onboarding_status: onboardingStatuses.READY,
                 modules_configuration_complete: true,
-                tenant_modules: tenantModules,
-                enabled_modules: enabledModuleKeys,
+                enabled_modules: moduleDefaults,
                 onboarding_completed_at: new Date().toISOString()
             });
             window.dispatchEvent(new CustomEvent("matrixsales:organizations-changed"));
@@ -642,20 +611,13 @@ function ModulesStep({ user, organization, onSaved }) {
             </CardHeader>
             <CardContent className="space-y-4">
                 <p className="text-sm leading-6 text-slate-600">
-                    HORIZON will seed tenant roles, document numbering, service billing defaults, dashboards,
-                    and <strong>{getBusinessTypeLabel(organization?.business_type || "it_services")}</strong> modules for <strong>{getOrgName(organization)}</strong>.
+                    HORIZON will seed default roles, tenant-specific document numbering, reports, dashboards,
+                    and standard modules for <strong>{getOrgName(organization)}</strong>.
                 </p>
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    {moduleCatalog.map((moduleItem) => (
-                        <span
-                            key={moduleItem.key}
-                            className={`rounded-xl border px-3 py-2 text-sm ${
-                                tenantModules[moduleItem.key]
-                                    ? "border-emerald-200 bg-emerald-50 font-semibold text-emerald-800"
-                                    : "border-slate-200 bg-slate-50 text-slate-400"
-                            }`}
-                        >
-                            {moduleItem.label}
+                <div className="flex flex-wrap gap-2">
+                    {moduleDefaults.map((moduleName) => (
+                        <span key={moduleName} className="rounded-full bg-[#eef3f9] px-3 py-1 text-sm font-semibold text-[#24466f]">
+                            {moduleName}
                         </span>
                     ))}
                 </div>
