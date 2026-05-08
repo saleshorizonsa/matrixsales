@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import MaterialForm from "@/components/admin/MaterialForm";
 import { usePermissions } from "@/components/utils/usePermissions";
+import { useOrganization } from "@/components/utils/OrganizationContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { getItemCode, itemToSelectOption, materialToSalesLinePatch, normalizeItemCode } from "@/lib/itemSelection";
 
@@ -19,7 +20,8 @@ export default function LineItemsTable({
     const [editingLines, setEditingLines] = useState(lineItems);
     const [createdItems, setCreatedItems] = useState([]);
     const [createDialog, setCreateDialog] = useState({ open: false, lineIndex: null, search: "" });
-    const { hasPermission, loading: permissionsLoading } = usePermissions();
+    const { hasPermission, isAdmin, loading: permissionsLoading } = usePermissions();
+    const { currentOrg } = useOrganization();
     const queryClient = useQueryClient();
 
     useEffect(() => {
@@ -137,7 +139,7 @@ export default function LineItemsTable({
             : itemToSelectOption(item)
     ));
 
-    const canCreateItems = !permissionsLoading && hasPermission('master_data.material', 'create');
+    const canCreateItems = permissionsLoading || isAdmin || hasPermission('master_data.material', 'create');
     const selectorLabel = itemType === "material" ? "material" : "item";
 
     const openCreateItem = (lineIndex, search = "") => {
@@ -156,6 +158,8 @@ export default function LineItemsTable({
             material_name: looksLikeCode ? "" : search,
             material_type: "finished_product",
             unit_of_measure: "piece",
+            organization_id: currentOrg?.id,
+            tenant_id: currentOrg?.id,
             status: "active",
             inventory_tracking_enabled: true,
             vat_rate: 15
@@ -169,10 +173,35 @@ export default function LineItemsTable({
             const list = Array.isArray(old) ? old : [];
             return [item, ...list.filter(existing => getItemCode(existing) !== getItemCode(item))];
         });
+        if (currentOrg?.id) {
+            queryClient.setQueryData(['materials', currentOrg.id], (old = []) => {
+                const list = Array.isArray(old) ? old : [];
+                return [item, ...list.filter(existing => getItemCode(existing) !== getItemCode(item))];
+            });
+        }
         queryClient.invalidateQueries({ queryKey: ['materials'] });
 
         if (createDialog.lineIndex !== null) {
             handleItemSelect(createDialog.lineIndex, getItemCode(item), item);
+        } else {
+            const newLine = {
+                line_number: editingLines.length + 1,
+                product_code: '',
+                product_name: '',
+                description: '',
+                quantity: 1,
+                unit_of_measure: 'piece',
+                unit_price: 0,
+                discount_percent: 0,
+                discount_amount: 0,
+                line_total: 0,
+                ...materialToSalesLinePatch(item)
+            };
+            const subtotal = (parseFloat(newLine.quantity) || 0) * (parseFloat(newLine.unit_price) || 0);
+            newLine.line_total = subtotal;
+            const updated = [...editingLines, newLine];
+            setEditingLines(updated);
+            onLineItemsChange(updated);
         }
     };
 
@@ -184,10 +213,18 @@ export default function LineItemsTable({
         <div className="space-y-4">
             <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-lg">Line Items</h3>
-                <Button type="button" onClick={handleAddLine} variant="outline" size="sm">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Line
-                </Button>
+                <div className="flex items-center gap-2">
+                    {canCreateItems && (
+                        <Button type="button" onClick={() => openCreateItem(null, "")} variant="outline" size="sm">
+                            <Plus className="w-4 h-4 mr-2" />
+                            Create Item
+                        </Button>
+                    )}
+                    <Button type="button" onClick={handleAddLine} variant="outline" size="sm">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Line
+                    </Button>
+                </div>
             </div>
 
             <div className="border rounded-lg">
