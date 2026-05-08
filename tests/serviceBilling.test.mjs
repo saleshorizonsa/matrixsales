@@ -5,6 +5,7 @@ import {
   calculateNextBillingDate,
   calculateServiceBusinessKpis,
   generateRecurringInvoices,
+  isMissingRecurringBillingRunTableError,
   shouldGenerateInvoiceForContract
 } from "../src/lib/serviceBilling.js";
 
@@ -121,4 +122,16 @@ test("service KPIs calculate MRR, ARR, renewals, and overdue invoices", () => {
   assert.equal(kpis.upcomingRenewals, 1);
   assert.equal(kpis.overdueInvoices, 1);
   assert.equal(kpis.serviceInvoices, 2);
+});
+
+test("missing recurring billing run table errors are detected as non-blocking logs", () => {
+  assert.equal(isMissingRecurringBillingRunTableError({
+    code: "PGRST205",
+    message: "Could not find the table 'public.recurring_billing_run' in the schema cache"
+  }), true);
+  assert.equal(isMissingRecurringBillingRunTableError({
+    code: "42P01",
+    message: "relation public.recurring_billing_run does not exist"
+  }), true);
+  assert.equal(isMissingRecurringBillingRunTableError(new Error("Network failed")), false);
 });

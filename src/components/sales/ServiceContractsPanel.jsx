@@ -6,7 +6,7 @@ import DataTable from "@/components/erp/DataTable";
 import ServiceContractForm from "@/components/sales/ServiceContractForm";
 import { matrixSales } from "@/api/matrixSalesClient";
 import { useToast } from "@/components/ui/use-toast";
-import { calculateServiceBusinessKpis, generateRecurringInvoices } from "@/lib/serviceBilling";
+import { calculateServiceBusinessKpis, generateRecurringInvoices, isMissingRecurringBillingRunTableError } from "@/lib/serviceBilling";
 import { createNotification } from "@/components/utils/notificationService";
 import { CalendarClock, FilePlus2, Plus, RefreshCw } from "lucide-react";
 
@@ -34,12 +34,17 @@ export default function ServiceContractsPanel({ invoices = [] }) {
         createNotification
       });
 
-      await matrixSales.entities.RecurringBillingRun.create({
-        run_date: new Date().toISOString(),
-        generated_count: generated.length,
-        status: "completed",
-        notes: `Generated ${generated.length} recurring invoice(s)`
-      });
+      try {
+        await matrixSales.entities.RecurringBillingRun.create({
+          run_date: new Date().toISOString(),
+          generated_count: generated.length,
+          status: "completed",
+          notes: `Generated ${generated.length} recurring invoice(s)`
+        });
+      } catch (error) {
+        if (!isMissingRecurringBillingRunTableError(error)) throw error;
+        console.warn("Recurring billing run log skipped because the database migration is not applied yet.", error);
+      }
 
       return generated;
     },

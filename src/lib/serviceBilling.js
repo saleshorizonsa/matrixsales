@@ -10,6 +10,11 @@ export const serviceBillingCycles = {
 export const isServiceInvoice = (invoice = {}) =>
   invoice.invoice_mode === "service" || invoice.invoice_category === "service";
 
+export const isMissingRecurringBillingRunTableError = (error) =>
+  error?.code === "PGRST205" ||
+  error?.code === "42P01" ||
+  /schema cache|relation .* does not exist|could not find the table/i.test(error?.message || "");
+
 export const addMonths = (dateInput, months = 1) => {
   const date = new Date(dateInput);
   const day = date.getDate();
